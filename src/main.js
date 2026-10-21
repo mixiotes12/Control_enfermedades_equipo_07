@@ -2002,8 +2002,8 @@ document.querySelector("#btn-exportar-csv")?.addEventListener("click", () => {
 // SINCRONIZACIÓN EN VIVO CON EL SERVIDOR (/api/datos)
 // ============================================================================
 async function sincronizarDatosEnVivo(mostrarNotificacion = false) {
-  const icono = document.querySelector("#icono-sync");
-  if (icono) icono.classList.add("spinning");
+  const pill = document.querySelector("#indicador-en-vivo");
+  if (pill) pill.classList.add("syncing");
   try {
     const res = await fetch("/api/datos");
     if (res.ok) {
@@ -2040,11 +2040,12 @@ async function sincronizarDatosEnVivo(mostrarNotificacion = false) {
   } catch {
     // En desarrollo estático usa datosSemilla sin fallar
   } finally {
-    if (icono) setTimeout(() => icono.classList.remove("spinning"), 400);
+    if (pill) setTimeout(() => pill.classList.remove("syncing"), 600);
   }
 }
 
-document.querySelector("#btn-refrescar")?.addEventListener("click", () => {
+// Clic opcional en la pastilla para forzar refresco manual
+document.querySelector("#indicador-en-vivo")?.addEventListener("click", () => {
   sincronizarDatosEnVivo(true);
 });
 
@@ -2087,6 +2088,11 @@ function iniciarPanel() {
   cambiarVista(vistaInicial, false);
 
   sincronizarDatosEnVivo(false);
+
+  // Sincronización automática periódica en segundo plano cada 10 segundos
+  setInterval(() => {
+    sincronizarDatosEnVivo(false);
+  }, 10000);
 }
 
 iniciarPanel();
