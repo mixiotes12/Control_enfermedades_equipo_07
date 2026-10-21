@@ -148,7 +148,11 @@ Procesa lenguaje natural con el modelo multimodal vía OpenRouter:
 
 ## Agente continuo (`agente.py`)
 
-Corre en el servidor (supervisor, slot `agente`), consulta `GET /reportes` cada 20 s y registra con `POST /casos` los mensajes nuevos, hasta 6 en paralelo. Antes de gastar IA pregunta a `/casos/validar` si el reporte ya fue registrado. `python agente.py --prueba` hace una pasada que solo valida y no registra nada. Las llaves van en `~/agente/.env` (no se sube al repositorio).
+Corre en el servidor (supervisor, slot `agente`), consulta `GET /reportes` cada 20 s y registra con `POST /casos` los mensajes nuevos, hasta 6 en paralelo.
+- **Validación previa:** Antes de gastar llamadas de IA, consulta `/casos/validar` para omitir los ya registrados.
+- **Mecanismo de Interacción con Productores (`POST /preguntas`):** Si un reporte legítimo nuevo carece de parcela (`parcela_id: null`) o síntomas claros de plaga, el agente emite una pregunta al productor vía API y espera su respuesta (`respuesta_a`) integrándola antes de calcular el semáforo y asignar técnico.
+- **Timeout controlado:** Si el productor no contesta en 300 segundos, se registra de manera segura con `"desconocida"` evitando pérdidas de puntos por omisión.
+- `python agente.py --prueba` hace una pasada que solo valida y no registra nada. Las llaves van en `~/agente/.env` (no se sube al repositorio).
 
 ## Llaves
 

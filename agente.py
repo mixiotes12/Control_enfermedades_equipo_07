@@ -32,6 +32,7 @@ from interprete import interpretar_mensaje_texto, transcribir_audio
 INTERVALO = 20      # segundos entre consultas a /reportes
 HILOS = 6           # reportes procesados en paralelo
 MAX_INTENTOS = 4    # intentos por reporte antes de darlo por fallido
+TIMEOUT_PREGUNTA_S = 300  # segundos a esperar respuesta del productor antes de registrar como desconocido
 AQUI = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -101,16 +102,41 @@ def ya_registrado(rep_id):
     return bool(res.get("ya_registrado_antes"))
 
 
-def armar_payload(rep, plagas, parcelas):
+def enviar_pregunta(rep_id, texto):
+    """Envía una pregunta al productor sobre un reporte que carece de datos."""
+    try:
+        res = api("POST", "/preguntas", {"reporte_id": rep_id, "texto": texto})
+        log(f"Pregunta enviada para {rep_id}: \"{texto}\" -> {res.get('mensaje')}")
+        return True
+    except Exception as e:
+        log(f"Error enviando pregunta para {rep_id}: {e}")
+        return False
+
+
+def armar_payload(rep, plagas, parcelas, respuestas_map=None):
     """Interpreta el reporte y devuelve el cuerpo para POST /casos."""
     rep_id = rep["id"]
-    parcela = parcelas.get(rep.get("parcela_id") or "")
+    parcela_id = rep.get("parcela_id")
+
+    # Si hay una respuesta del productor para este reporte, integrar su texto
+    texto_adicional = ""
+    if respuestas_map and rep_id in respuestas_map:
+        rep_resp = respuestas_map[rep_id]
+        texto_adicional = f"\nRespuesta posterior del productor: \"{rep_resp.get('texto') or ''}\""
+        if not parcela_id and rep_resp.get("parcela_id"):
+            parcela_id = rep_resp["parcela_id"]
+
+    parcela = parcelas.get(parcela_id or "")
     cultivo = parcela["cultivo"] if parcela else None
-    texto = rep.get("texto")
+    texto = (rep.get("texto") or "") + texto_adicional
+    if not texto.strip():
+        texto = None
     foto = None
 
     if rep.get("tipo") == "voz" and rep.get("audio_url"):
         texto = transcribir_audio(descargar(rep["audio_url"]), API_KEY)
+        if texto_adicional:
+            texto += texto_adicional
     elif rep.get("tipo") == "foto" and rep.get("foto_url"):
         foto = descargar(rep["foto_url"])
 
@@ -121,6 +147,14 @@ def armar_payload(rep, plagas, parcelas):
 
     plaga_id = ia.get("plaga") or "desconocida"
     plaga = plagas.get(plaga_id)
+
+    # Si falta información clave (parcela desconocida o plaga desconocida en reporte nuevo),
+    # señalizar 'necesita_aclaracion' para enviar pregunta antes de registrar
+    necesita_pregunta = (
+        not ia.get("es_seguimiento")
+        and (parcela is None or plaga_id == "desconocida")
+    )
+    ia["necesita_pregunta"] = necesita_pregunta
 
     # Seguimiento, plaga no identificada o parcela desconocida: no abre caso (sin semáforo ni técnico).
     if ia.get("es_seguimiento") or plaga is None or parcela is None:
@@ -140,21 +174,55 @@ def armar_payload(rep, plagas, parcelas):
     }, ia
 
 
-def atender(rep, plagas, parcelas, prueba):
-    """Procesa un reporte. Devuelve (estado, detalle): 'ok', 'omitido' o lanza excepción."""
+def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map):
+    """Procesa un reporte. Devuelve (estado, detalle): 'ok', 'omitido', 'esperando_respuesta' o lanza excepción."""
     rep_id = rep["id"]
     if ya_registrado(rep_id):
+        preguntas_activas.pop(rep_id, None)
         return "omitido", None
-    payload, ia = armar_payload(rep, plagas, parcelas)
+
+    # Si ya hay una pregunta activa para este reporte y aún no hay respuesta, verificar timeout
+    ahora = time.time()
+    if rep_id in preguntas_activas and rep_id not in respuestas_map:
+        t_pregunta = preguntas_activas[rep_id]
+        if ahora - t_pregunta < TIMEOUT_PREGUNTA_S:
+            return "esperando_respuesta", None
+        else:
+            log(f"{rep_id}: Se agotó el tiempo de espera ({TIMEOUT_PREGUNTA_S}s) de respuesta del productor. Registrando...")
+
+    payload, ia = armar_payload(rep, plagas, parcelas, respuestas_map)
+
+    # Si necesita aclaración y todavía no le hemos preguntado ni respondido:
+    if ia.get("necesita_pregunta") and rep_id not in preguntas_activas and rep_id not in respuestas_map:
+        pregunta_txt = "¿Podría indicarnos en cuál de sus parcelas está el problema o qué síntomas observa con más detalle?"
+        if not rep.get("parcela_id"):
+            pregunta_txt = "¿En cuál de sus parcelas se ubica este cultivo afectado?"
+        elif ia.get("plaga") == "desconocida":
+            pregunta_txt = "¿Qué síntomas específicos observa en las hojas, cogollo, fruto o raíz?"
+
+        enviado = enviar_pregunta(rep_id, pregunta_txt)
+        if enviado:
+            preguntas_activas[rep_id] = ahora
+            return "esperando_respuesta", None
+
     if prueba:
         res = api("POST", "/casos/validar", payload)
         return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
     res = api("POST", "/casos", payload)
+    preguntas_activas.pop(rep_id, None)
     return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
 
 
-def ciclo(plagas, parcelas, hechos, fallos, prueba):
+def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas):
     reportes = api("GET", "/reportes")
+
+    # Mapear respuestas de productores asociadas a reportes previos
+    respuestas_map = {}
+    for r in reportes:
+        ref = r.get("respuesta_a")
+        if ref:
+            respuestas_map[ref] = r
+
     pendientes = [
         r for r in reportes
         if r["id"] not in hechos and not r.get("respuesta_a") and fallos.get(r["id"], 0) < MAX_INTENTOS
@@ -168,10 +236,11 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba):
         plagas.update(nuevas_plagas)
         parcelas.update(nuevas_parcelas)
 
-    log(f"{len(pendientes)} reporte(s) pendiente(s)")
+    log(f"{len(pendientes)} reporte(s) en seguimiento")
     t0 = time.time()
+    procesados = 0
     with ThreadPoolExecutor(max_workers=HILOS) as ex:
-        futuros = {ex.submit(atender, r, plagas, parcelas, prueba): r for r in pendientes}
+        futuros = {ex.submit(atender, r, plagas, parcelas, prueba, preguntas_activas, respuestas_map): r for r in pendientes}
         for fut, rep in futuros.items():
             rep_id = rep["id"]
             try:
@@ -180,13 +249,19 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba):
                 fallos[rep_id] = fallos.get(rep_id, 0) + 1
                 log(f"{rep_id} ({rep.get('tipo')}) ERROR intento {fallos[rep_id]}/{MAX_INTENTOS}: {e}")
                 continue
-            hechos.add(rep_id)
+
             if estado == "omitido":
+                hechos.add(rep_id)
                 log(f"{rep_id} ya estaba registrado")
+            elif estado == "esperando_respuesta":
+                # Sigue pendiente de respuesta del productor
+                pass
             else:
+                hechos.add(rep_id)
+                procesados += 1
                 log(f"{rep_id} ({rep.get('tipo')}) -> {json.dumps(det['payload'], ensure_ascii=False)} | API: {json.dumps(det['api'], ensure_ascii=False)}")
     log(f"ciclo terminado en {time.time() - t0:.1f}s")
-    return len(pendientes)
+    return procesados
 
 
 def resumen():
@@ -212,14 +287,15 @@ def main():
         f"intervalo {INTERVALO}s, {HILOS} hilos")
     plagas, parcelas = cargar_catalogos()
     hechos, fallos = set(), {}
+    preguntas_activas = {}
 
     if prueba:
-        ciclo(plagas, parcelas, hechos, fallos, prueba=True)
+        ciclo(plagas, parcelas, hechos, fallos, prueba=True, preguntas_activas=preguntas_activas)
         return
 
     while True:
         try:
-            if ciclo(plagas, parcelas, hechos, fallos, prueba=False):
+            if ciclo(plagas, parcelas, hechos, fallos, prueba=False, preguntas_activas=preguntas_activas):
                 resumen()
         except Exception as e:
             log(f"Error en el ciclo (se reintenta): {e}")
