@@ -6778,9 +6778,45 @@
       "recibido": "2026-10-21T09:48:46-06:00",
       "duracion_s": 7,
       "respuesta_a": null
+    },
+    {
+      "id": "R-2085",
+      "productor_id": "PR-184",
+      "parcela_id": "P-116",
+      "tipo": "texto",
+      "texto": "Buenos días. Es la gallina ciega otra vez, salen los gusanos blancos al escarbar. ¿Qué hago?",
+      "audio_url": null,
+      "foto_url": null,
+      "lat": 19.56854,
+      "lon": -98.87043,
+      "recibido": "2026-10-21T09:56:39-06:00",
+      "duracion_s": null,
+      "respuesta_a": null
     }
   ],
   "avisos": [
+    {
+      "id": 340,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2085",
+      "tipo": "asignacion",
+      "para": [
+        "T-03"
+      ],
+      "mensaje": "Asignación de caso R-2085: plaga gallina_ciega en parcela P-116 (avena), semáforo amarillo.",
+      "creado": "2026-10-21T09:56:59-06:00"
+    },
+    {
+      "id": 339,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2085",
+      "tipo": "folio",
+      "para": [
+        "PR-184"
+      ],
+      "mensaje": "Su reporte R-2085 en parcela P-116 (gallina_ciega, semáforo amarillo) fue registrado. Técnico asignado: T-03.",
+      "creado": "2026-10-21T09:56:59-06:00"
+    },
     {
       "id": 332,
       "equipo_id": "equipo07",
@@ -9996,6 +10032,18 @@
       "prioridad": 67,
       "tecnico_id": "T-12",
       "brote": true
+    },
+    {
+      "reporte_id": "R-2085",
+      "parcela_id": "P-116",
+      "lat": 19.56846,
+      "lon": -98.87063,
+      "plaga": "gallina_ciega",
+      "recibido": "2026-10-21T09:56:39-06:00",
+      "semaforo": "amarillo",
+      "prioridad": 51,
+      "tecnico_id": "T-03",
+      "brote": false
     }
   ]
 }

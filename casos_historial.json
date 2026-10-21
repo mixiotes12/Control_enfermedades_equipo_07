@@ -706,5 +706,17 @@
     "prioridad": 67,
     "tecnico_id": "T-12",
     "brote": true
+  },
+  {
+    "reporte_id": "R-2085",
+    "parcela_id": "P-116",
+    "lat": 19.56846,
+    "lon": -98.87063,
+    "plaga": "gallina_ciega",
+    "recibido": "2026-10-21T09:56:39-06:00",
+    "semaforo": "amarillo",
+    "prioridad": 51,
+    "tecnico_id": "T-03",
+    "brote": false
   }
 ]
