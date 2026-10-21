@@ -19,6 +19,7 @@ Configuración (variables de entorno o archivo .env junto a este script):
 import json
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -26,7 +27,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from clasificador import calcular_prioridad_y_semaforo, seleccionar_tecnico
+from clasificador import calcular_prioridad_y_semaforo, seleccionar_tecnico, calcular_brote
 from interprete import interpretar_mensaje_texto, transcribir_audio
 
 INTERVALO = 20      # segundos entre consultas a /reportes
@@ -34,6 +35,8 @@ HILOS = 6           # reportes procesados en paralelo
 MAX_INTENTOS = 4    # intentos por reporte antes de darlo por fallido
 TIMEOUT_PREGUNTA_S = 300  # segundos a esperar respuesta del productor antes de registrar como desconocido
 AQUI = os.path.dirname(os.path.abspath(__file__))
+RUTA_HISTORIAL = os.path.join(AQUI, "casos_historial.json")
+HISTORIAL_LOCK = threading.Lock()
 
 
 def log(*partes):
@@ -96,6 +99,52 @@ def cargar_catalogos():
     return plagas, parcelas
 
 
+def cargar_historial_base():
+    """Carga los casos previos de la API + casos_historial.json local (deduplicados por reporte_id)."""
+    por_id = {}
+    try:
+        for c in api("GET", "/casos-previos"):
+            rid = c.get("reporte_id") or c.get("id")
+            if rid:
+                por_id[rid] = {
+                    "reporte_id": rid,
+                    "parcela_id": c["parcela_id"],
+                    "lat": c["lat"],
+                    "lon": c["lon"],
+                    "plaga": c["plaga"],
+                    "recibido": c["recibido"],
+                }
+    except Exception as e:
+        log(f"Aviso: no se pudo cargar /casos-previos: {e}")
+
+    if os.path.exists(RUTA_HISTORIAL):
+        try:
+            with open(RUTA_HISTORIAL, encoding="utf-8") as f:
+                for c in json.load(f):
+                    rid = c.get("reporte_id")
+                    if rid:
+                        por_id[rid] = c
+        except Exception as e:
+            log(f"Aviso: no se pudo leer {RUTA_HISTORIAL}: {e}")
+    return por_id
+
+
+def guardar_caso_historial(historial_por_id, caso):
+    """Guarda un caso nuevo en memoria y en casos_historial.json de forma segura entre hilos."""
+    with HISTORIAL_LOCK:
+        historial_por_id[caso["reporte_id"]] = caso
+        try:
+            # Persistir todos los casos nuevos (R-2xxx) en casos_historial.json
+            nuevos = [
+                c for rid, c in sorted(historial_por_id.items())
+                if str(rid).startswith("R-2")
+            ]
+            with open(RUTA_HISTORIAL, "w", encoding="utf-8") as f:
+                json.dump(nuevos, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            log(f"Aviso: no se pudo guardar {RUTA_HISTORIAL}: {e}")
+
+
 def ya_registrado(rep_id):
     """Pregunta a la API (sin gastar IA) si el reporte ya tiene resultado."""
     res = api("POST", "/casos/validar", {"reporte_id": rep_id, "es_plaga": False})
@@ -113,7 +162,7 @@ def enviar_pregunta(rep_id, texto):
         return False
 
 
-def armar_payload(rep, plagas, parcelas, respuestas_map=None):
+def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=None):
     """Interpreta el reporte y devuelve el cuerpo para POST /casos."""
     rep_id = rep["id"]
     parcela_id = rep.get("parcela_id")
@@ -164,17 +213,25 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None):
     prioridad, semaforo = calcular_prioridad_y_semaforo(plaga, parcela, 10 if pct is None else pct)
     momento = urllib.parse.quote(rep["recibido"])
     tecnico = seleccionar_tecnico(api("GET", f"/tecnicos?momento={momento}"), plaga, parcela)
+    with HISTORIAL_LOCK:
+        casos_previos = [
+            c for rid, c in (historial_por_id or {}).items()
+            if rid != rep_id
+        ]
+    brote = calcular_brote(casos_previos, plaga_id, parcela["lat"], parcela["lon"], rep["recibido"])
+    ia["parcela_resuelta"] = parcela
     return {
         "reporte_id": rep_id,
         "es_plaga": True,
         "plaga": plaga_id,
         "semaforo": semaforo,
         "tecnico_id": tecnico,
+        "brote": brote,
         "prioridad": prioridad,
     }, ia
 
 
-def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map):
+def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id):
     """Procesa un reporte. Devuelve (estado, detalle): 'ok', 'omitido', 'esperando_respuesta' o lanza excepción."""
     rep_id = rep["id"]
     if ya_registrado(rep_id):
@@ -190,7 +247,7 @@ def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map):
         else:
             log(f"{rep_id}: Se agotó el tiempo de espera ({TIMEOUT_PREGUNTA_S}s) de respuesta del productor. Registrando...")
 
-    payload, ia = armar_payload(rep, plagas, parcelas, respuestas_map)
+    payload, ia = armar_payload(rep, plagas, parcelas, respuestas_map, historial_por_id)
 
     # Si necesita aclaración y todavía no le hemos preguntado ni respondido:
     if ia.get("necesita_pregunta") and rep_id not in preguntas_activas and rep_id not in respuestas_map:
@@ -210,10 +267,23 @@ def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map):
         return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
     res = api("POST", "/casos", payload)
     preguntas_activas.pop(rep_id, None)
+
+    # Si abrió un caso nuevo (tiene semáforo y parcela resuelta), guardarlo en el historial para futuros brotes
+    parcela_res = ia.get("parcela_resuelta")
+    if payload.get("es_plaga") and "semaforo" in payload and parcela_res:
+        guardar_caso_historial(historial_por_id, {
+            "reporte_id": rep_id,
+            "parcela_id": parcela_res["id"],
+            "lat": parcela_res["lat"],
+            "lon": parcela_res["lon"],
+            "plaga": payload["plaga"],
+            "recibido": rep["recibido"],
+        })
+
     return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
 
 
-def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas):
+def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial_por_id):
     reportes = api("GET", "/reportes")
 
     # Mapear respuestas de productores asociadas a reportes previos
@@ -223,10 +293,13 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas):
         if ref:
             respuestas_map[ref] = r
 
-    pendientes = [
-        r for r in reportes
-        if r["id"] not in hechos and not r.get("respuesta_a") and fallos.get(r["id"], 0) < MAX_INTENTOS
-    ]
+    pendientes = sorted(
+        [
+            r for r in reportes
+            if r["id"] not in hechos and not r.get("respuesta_a") and fallos.get(r["id"], 0) < MAX_INTENTOS
+        ],
+        key=lambda r: (r.get("recibido") or "", r["id"]),
+    )
     if not pendientes:
         return 0
 
@@ -240,7 +313,10 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas):
     t0 = time.time()
     procesados = 0
     with ThreadPoolExecutor(max_workers=HILOS) as ex:
-        futuros = {ex.submit(atender, r, plagas, parcelas, prueba, preguntas_activas, respuestas_map): r for r in pendientes}
+        futuros = {
+            ex.submit(atender, r, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id): r
+            for r in pendientes
+        }
         for fut, rep in futuros.items():
             rep_id = rep["id"]
             try:
@@ -286,16 +362,18 @@ def main():
     log(f"Agente iniciado ({'PRUEBA: solo validar' if prueba else 'REGISTRANDO en producción'}), "
         f"intervalo {INTERVALO}s, {HILOS} hilos")
     plagas, parcelas = cargar_catalogos()
+    historial_por_id = cargar_historial_base()
+    log(f"Historial cargado con {len(historial_por_id)} casos base para cálculo de brotes")
     hechos, fallos = set(), {}
     preguntas_activas = {}
 
     if prueba:
-        ciclo(plagas, parcelas, hechos, fallos, prueba=True, preguntas_activas=preguntas_activas)
+        ciclo(plagas, parcelas, hechos, fallos, prueba=True, preguntas_activas=preguntas_activas, historial_por_id=historial_por_id)
         return
 
     while True:
         try:
-            if ciclo(plagas, parcelas, hechos, fallos, prueba=False, preguntas_activas=preguntas_activas):
+            if ciclo(plagas, parcelas, hechos, fallos, prueba=False, preguntas_activas=preguntas_activas, historial_por_id=historial_por_id):
                 resumen()
         except Exception as e:
             log(f"Error en el ciclo (se reintenta): {e}")

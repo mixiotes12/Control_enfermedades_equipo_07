@@ -1,4 +1,5 @@
 import math
+from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 def redondear_comercial(val):
@@ -125,3 +126,28 @@ def seleccionar_tecnico(tecnicos_disponibles, plaga_info, parcela_info):
     candidatos.sort(key=lambda x: (x["dist_metros"], x["carga"], x["id"]))
 
     return candidatos[0]["id"]
+
+
+def calcular_brote(historial_casos, plaga_id, lat, lon, momento_iso):
+    """
+    Calcula si existe un brote activo para el caso actual:
+    Hay brote si, contando este caso, hay 3 o más casos de la misma plaga
+    con parcelas a menos de 5 km (<= 5.0 km), en los últimos 7 días (0 a 7 días).
+    """
+    t_actual = datetime.fromisoformat(momento_iso)
+    lat_actual = float(lat)
+    lon_actual = float(lon)
+
+    vecinos = 1  # Contando este caso actual
+    for prev in historial_casos:
+        if prev.get("plaga") != plaga_id:
+            continue
+        t_prev = datetime.fromisoformat(prev["recibido"])
+        diff_dias = (t_actual - t_prev).total_seconds() / 86400.0
+        if 0 <= diff_dias <= 7.0:
+            dist = haversine_km(lat_actual, lon_actual, float(prev["lat"]), float(prev["lon"]))
+            if dist <= 5.0:
+                vecinos += 1
+
+    return vecinos >= 3
+

@@ -121,7 +121,8 @@ El proyecto incluye el motor de reglas determinista (`clasificador.py`) para el 
 - **Cálculo de Prioridad (0 a 100):** Severidad + Superficie afectada + Etapa fenológica (o 100 directo para plagas cuarentenarias).
 - **Semáforo:** Asignación automática de nivel de atención (Verde, Amarillo, Naranja, Rojo).
 - **Asignación de Técnicos:** Selección por especialidad (`entomologia` / `fitopatologia`), filtro de carga (< 5) a la hora del reporte y distancia geodésica mínima (Haversine con $R = 6371\text{ km}$).
-- **Validación Oficial:** El script `validar_clasificador.py` comprueba las reglas contra los 40 casos de `GET /casos-previos` de la API de la junta, verificando 100% de coincidencia antes de registrar en producción.
+- **Detección de Brotes (`calcular_brote`):** Identifica automáticamente si existen 3 o más casos de la misma plaga a $\le 5\text{ km}$ en los últimos 7 días (contando `GET /casos-previos` y el historial de casos nuevos en `casos_historial.json`).
+- **Validación Oficial:** El script `validar_clasificador.py` comprueba las 4 reglas (`prioridad`, `semaforo`, `tecnico` y `brote`) contra los 40 casos de `GET /casos-previos` de la API de la junta, verificando 100% de coincidencia antes de registrar en producción.
 
 ```bash
 # Ejecutar validación de los 40 casos oficiales
