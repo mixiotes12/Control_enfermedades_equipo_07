@@ -144,6 +144,11 @@ Procesa lenguaje natural con el modelo multimodal vía OpenRouter:
   - En fotos, la imagen manda sobre el cultivo de la parcela (evita que el cultivo sesgue la plaga) y se usa `openai/gpt-4o` para visión; texto y voz transcrita siguen con `gpt-4o-mini`.
   - Fracciones exactas del productor ("una quinta parte" = 20 %, etc.) para que la prioridad coincida.
   - Umbral de confianza: si la IA marca confianza `baja`, la plaga se registra como `"desconocida"` (0 puntos) en vez de arriesgar plaga, semáforo y técnico.
+  - Estabilidad: `temperature=0` y `seed` fijo (texto y transcripción). Los mensajes vagos ("mi maíz amaneció mal, no sé qué tiene") cuentan como reporte con plaga `"desconocida"`, y una regla en código marca como seguimiento cualquier mención a "mi reporte/visita", porque el modelo era inestable en ese caso.
+
+## Agente continuo (`agente.py`)
+
+Corre en el servidor (supervisor, slot `agente`), consulta `GET /reportes` cada 20 s y registra con `POST /casos` los mensajes nuevos, hasta 6 en paralelo. Antes de gastar IA pregunta a `/casos/validar` si el reporte ya fue registrado. `python agente.py --prueba` hace una pasada que solo valida y no registra nada. Las llaves van en `~/agente/.env` (no se sube al repositorio).
 
 ## Llaves
 

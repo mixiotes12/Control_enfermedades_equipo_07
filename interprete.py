@@ -3,6 +3,12 @@ import urllib.request
 import base64
 import re
 
+# Menciones a SU reporte/visita previa: seguimiento aunque el modelo lo haya descartado.
+SEGUIMIENTO_RE = re.compile(
+    r"\b(mi|mis)\s+(reporte|reportes|aviso|avisos|visita)\b|\blo de ayer\b|\bsigue igual\b",
+    re.IGNORECASE,
+)
+
 CATALOGO_PLAGAS = """
 1. ID: "gusano_cogollero" (Maíz). Nombres locales: gusano, gusano del cogollo, cogollero, gusano soldado. Síntomas: hojas perforadas/raspadas como ventana, excremento como aserrín en cogollo, larvas verde/café con Y invertida en cabeza.
 2. ID: "roya_frijol" (Frijol). Nombres locales: chahuixtle, roya, polvillo. Síntomas: pústulas café rojizo en envés, polvo color óxido que mancha dedos, hojas amarillas que caen.
@@ -21,6 +27,9 @@ Analizas mensajes enviados por agricultores (texto, audio transcrito o fotos con
 
 1. "es_plaga": true para cualquier reporte sobre plagas o enfermedades en cultivos, INCLUYENDO seguimientos de casos previos: cualquier mensaje que se refiera a un reporte o visita que el productor ya hizo ("¿ya vienen a revisar lo de ayer?", "sigue igual", "¿qué pasó con mi reporte?", "nomás para confirmar que les llegó mi reporte", "¿ya mandaron al técnico?").
    false ÚNICAMENTE si son mensajes de trámites de fertilizante, horarios de oficina, pedidos o paquetes ajenos (postales, etc.), pláticas, agradecimientos o saludos aislados SIN referencia a un reporte, bromas o temas ajenos a la sanidad vegetal.
+   Preguntar o avisar sobre SU reporte, aviso o visita ("confirmar que les llegó mi reporte", "¿ya mandaron al técnico?", "¿vienen hoy?") es un seguimiento: es_plaga=true, es_seguimiento=true, plaga="desconocida", aunque no describa síntomas.
+   En cambio, algo que "llegó" SIN relación con su reporte (postales, paquetes, apoyos, fertilizante) NO es reporte.
+   Si el productor dice que su cultivo "amaneció mal", está enfermo, dañado o raro aunque NO sepa qué tiene ("no sé qué tiene"), ES un reporte: es_plaga=true con plaga="desconocida". Nunca lo descartes como no-plaga por ser vago.
 2. "es_seguimiento": true ÚNICAMENTE si el mensaje NO describe síntomas nuevos y solo pregunta por un reporte previo ("¿ya vienen a revisar lo de ayer?", "¿cuándo van a venir a ver el gusano?", "sigue igual que ayer").
    false si el mensaje describe los síntomas por primera vez, detalla daños o pide auxilio con un reporte nuevo (frases de cortesía como "quedo pendiente" o "espero su ayuda" al final NO son seguimientos).
 3. "plaga": El id exacto de la plaga del catálogo:
@@ -47,6 +56,8 @@ def transcribir_audio(audio_bytes, api_key):
     audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
     payload = {
         "model": "qwen/qwen3.8-omni-flash",
+        "temperature": 0.0,
+        "seed": 7,
         "messages": [
             {
                 "role": "user",
@@ -103,6 +114,7 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
             {"role": "user", "content": user_content}
         ],
         "temperature": 0.0,
+        "seed": 7,
         "response_format": {"type": "json_object"}
     }
 
@@ -119,6 +131,11 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
         res_data = json.loads(resp.read().decode("utf-8"))
         content = res_data["choices"][0]["message"]["content"]
         parsed = json.loads(content)
+
+        # Red de seguridad en código: si el mensaje habla de SU reporte/visita, es un seguimiento
+        # aunque el modelo lo haya descartado (caso inestable observado en la práctica).
+        if not parsed.get("es_plaga") and texto and SEGUIMIENTO_RE.search(texto):
+            parsed.update({"es_plaga": True, "es_seguimiento": True, "plaga": "desconocida", "pct": 10})
 
         # Regla Oficial Sección 6 y 9: Si es seguimiento y no trae plaga, 'desconocida' es correcto.
         if parsed.get("es_seguimiento") and (not parsed.get("plaga") or parsed.get("plaga") == "null"):
