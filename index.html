@@ -3,120 +3,605 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Alerta Plaga · Control Sanitario Agrícola</title>
+  <title>Alerta Plaga · Panel de Agricultores y Coordinación Técnica (Equipo 07 · MISA)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 </head>
 <body>
-  <header>
-    <div class="header-contenido">
-      <div>
-        <span class="badge">Equipo 07 · DIMA Chapingo</span>
-        <h1>Alerta Plaga: Bitácora & Monitoreo Geoespacial</h1>
+  <!-- Fondo ambiental decorativo -->
+  <div class="ambient-glow glow-1" aria-hidden="true"></div>
+  <div class="ambient-glow glow-2" aria-hidden="true"></div>
+
+  <!-- Notificación Toast Flotante -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Encabezado Principal Sticky con Conmutador de Roles -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-area">
+        <div class="brand-badges">
+          <span class="badge-equipo">
+            <span class="pulse-dot"></span>
+            Equipo 07 · MISA · DIMA Chapingo
+          </span>
+          <span class="badge-nivel">Hackathon Nivel 2 · En Vivo</span>
+        </div>
+        <h1 class="brand-title">Alerta Plaga <span class="brand-subtitle">Vigilancia Fitosanitaria & Control Geoespacial</span></h1>
       </div>
-      <div id="usuario-sesion" class="usuario-sesion">
-        <span id="productor-nombre">Productor: Don Jacinto (PR-101)</span>
-        <button id="btn-cambiar-productor" class="btn-secundario">Cambiar</button>
+
+      <!-- Conmutador de Vistas (Agricultor / Técnico / Bitácora) -->
+      <nav class="role-switcher" aria-label="Cambiar vista del panel">
+        <button type="button" class="role-btn active" data-vista="tecnico" id="tab-tecnico">
+          <span class="role-icon">🔬</span>
+          <div class="role-text">
+            <span class="role-label">Panel de Técnicos</span>
+            <span class="role-sub">Casos Nivel 2, Brotes y Rutas</span>
+          </div>
+        </button>
+        <button type="button" class="role-btn" data-vista="agricultor" id="tab-agricultor">
+          <span class="role-icon">👨‍🌾</span>
+          <div class="role-text">
+            <span class="role-label">Portal Agricultor</span>
+            <span class="role-sub">Mi Parcela, Radar 5km y Reporte</span>
+          </div>
+        </button>
+        <button type="button" class="role-btn" data-vista="bitacora" id="tab-bitacora">
+          <span class="role-icon">📓</span>
+          <div class="role-text">
+            <span class="role-label">Bitácora & Avisos</span>
+            <span class="role-sub">Supabase y Buzón Oficial</span>
+          </div>
+        </button>
+      </nav>
+
+      <div class="topbar-actions">
+        <button type="button" id="btn-refrescar" class="btn-icon-action" title="Sincronizar con el Agente IA en vivo">
+          <span class="sync-icon" id="icono-sync">🔄</span>
+          <span id="texto-sync">En vivo</span>
+        </button>
       </div>
     </div>
   </header>
 
-  <main>
-    <!-- Columna Izquierda: Formulario de Reporte y Marcado de Daño -->
-    <section class="tarjeta panel-formulario">
-      <h2>Reportar Afección de Parcela</h2>
-      <form id="registro">
-        <div class="dos">
-          <div class="campo">
-            <label for="fecha">Fecha</label>
-            <input id="fecha" type="date" name="fecha" required>
+  <!-- Cinta de Métricas Globales (KPIs Animados) -->
+  <section class="kpi-ribbon" aria-label="Resumen ejecutivo en tiempo real">
+    <div class="kpi-card kpi-total">
+      <div class="kpi-icon-wrap">📊</div>
+      <div class="kpi-info">
+        <span class="kpi-title">Casos Nivel 2 Procesados</span>
+        <div class="kpi-value-row">
+          <strong class="kpi-number" id="kpi-total-casos">42</strong>
+          <span class="kpi-chip" id="kpi-sub-previos">+40 históricos</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-criticos">
+      <div class="kpi-icon-wrap">🚨</div>
+      <div class="kpi-info">
+        <span class="kpi-title">Urgencia Alta (Rojo / Naranja)</span>
+        <div class="kpi-value-row">
+          <strong class="kpi-number" id="kpi-urgentes">0</strong>
+          <span class="kpi-chip chip-danger" id="kpi-cuarentenarias">0 cuarentenarias</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-brotes">
+      <div class="kpi-icon-wrap">🔥</div>
+      <div class="kpi-info">
+        <span class="kpi-title">Brotes Activos (&le; 5 km / 7d)</span>
+        <div class="kpi-value-row">
+          <strong class="kpi-number" id="kpi-brotes-count">0</strong>
+          <span class="kpi-chip chip-warning">Cerco epidemiológico</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-card kpi-tecnicos">
+      <div class="kpi-icon-wrap">👨‍🔬</div>
+      <div class="kpi-info">
+        <span class="kpi-title">Fuerza Técnica Desplegada</span>
+        <div class="kpi-value-row">
+          <strong class="kpi-number" id="kpi-tecnicos-activos">12</strong>
+          <span class="kpi-chip chip-info" id="kpi-avisos-total">105 avisos emitidos</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       VISTA 1: CENTRO DE CONTROL TÉCNICO & COORDINACIÓN (NIVEL 2)
+       ======================================================================== -->
+  <main id="vista-tecnico" class="vista-contenedor vista-activa">
+    <!-- Banner contextual para técnicos -->
+    <div class="section-banner banner-tecnico">
+      <div class="banner-left">
+        <span class="banner-tag">COORDINACIÓN FITOSANITARIA · NIVEL 2</span>
+        <h2>Monitoreo Regional de Casos, Brotes Epidemiológicos y Asignación de Técnicos</h2>
+        <p>Visualiza en tiempo real los reportes clasificados por IA multimodal (texto, voz y foto), los anillos de brote (&ge;3 casos de la misma plaga a &le;5 km en 7 días) y la carga operativa de los 12 especialistas.</p>
+      </div>
+      <div class="banner-semaforos" id="resumen-semaforos-bar">
+        <button type="button" class="sem-pill sem-pill-todos active" data-sem="todos">
+          <span>Todos</span> <strong id="count-sem-todos">42</strong>
+        </button>
+        <button type="button" class="sem-pill sem-pill-rojo" data-sem="rojo">
+          <span class="dot dot-rojo"></span> <span>Rojo</span> <strong id="count-sem-rojo">0</strong>
+        </button>
+        <button type="button" class="sem-pill sem-pill-naranja" data-sem="naranja">
+          <span class="dot dot-naranja"></span> <span>Naranja</span> <strong id="count-sem-naranja">0</strong>
+        </button>
+        <button type="button" class="sem-pill sem-pill-amarillo" data-sem="amarillo">
+          <span class="dot dot-amarillo"></span> <span>Amarillo</span> <strong id="count-sem-amarillo">0</strong>
+        </button>
+        <button type="button" class="sem-pill sem-pill-verde" data-sem="verde">
+          <span class="dot dot-verde"></span> <span>Verde</span> <strong id="count-sem-verde">0</strong>
+        </button>
+      </div>
+    </div>
+
+    <!-- Grid Superior Técnico: Mapa Táctico + Panel de Técnicos -->
+    <div class="tecnico-top-grid">
+      <!-- Mapa Táctico Geoespacial -->
+      <div class="tarjeta card-mapa-tactico">
+        <div class="card-header-row">
+          <div>
+            <h3>🗺️ Mapa Táctico de Alertas, Brotes y Cobertura Técnica</h3>
+            <p class="sub-hint">Haz clic en cualquier marcador para inspeccionar el caso, su radio de 5 km y la línea de asignación al técnico.</p>
           </div>
-          <div class="campo">
-            <label for="parcela">Parcela Asignada</label>
-            <select id="parcela" name="parcela" required>
-              <option value="">Cargando parcelas...</option>
+          <div class="mapa-toggles">
+            <button type="button" id="toggle-radios-brote" class="chip-toggle active" title="Mostrar círculos de 5 km en casos con brote">
+              🔥 Radios Brote (5 km)
+            </button>
+            <button type="button" id="toggle-bases-tecnicos" class="chip-toggle active" title="Mostrar bases de los 12 técnicos y rutas">
+              👨‍🔬 Técnicos & Rutas
+            </button>
+            <button type="button" id="toggle-casos-previos" class="chip-toggle" title="Superponer los 40 casos previos (R-1001..R-1040)">
+              📚 +40 Casos Previos
+            </button>
+            <button type="button" id="btn-centrar-mapa-tec" class="chip-toggle" title="Restablecer vista regional">
+              🎯 Centrar Región
+            </button>
+          </div>
+        </div>
+        <div id="mapa-tecnico" class="mapa-lienzo"></div>
+        <div class="mapa-leyenda">
+          <span class="ley-item"><i class="ley-dot dot-rojo"></i> Semáforo Rojo (24h)</span>
+          <span class="ley-item"><i class="ley-dot dot-naranja"></i> Semáforo Naranja (48h)</span>
+          <span class="ley-item"><i class="ley-dot dot-amarillo"></i> Semáforo Amarillo (72h)</span>
+          <span class="ley-item"><i class="ley-dot dot-verde"></i> Semáforo Verde (7d)</span>
+          <span class="ley-item"><i class="ley-ring"></i> 🔥 Brote Activo (&le;5 km)</span>
+          <span class="ley-item"><i class="ley-tec">T</i> Base de Técnico</span>
+        </div>
+      </div>
+
+      <!-- Columna Lateral: Fuerza Técnica (T-01 a T-12) -->
+      <div class="tarjeta card-escuadron-tecnico">
+        <div class="card-header-row">
+          <div>
+            <h3>👨‍🔬 Escuadrón de Técnicos (T-01 a T-12)</h3>
+            <p class="sub-hint">Selecciona un especialista para filtrar su ruta y casos asignados.</p>
+          </div>
+          <button type="button" id="btn-limpiar-tecnico" class="btn-mini-reset oculto">Ver todos</button>
+        </div>
+        <div id="lista-tecnicos-cards" class="tecnicos-scroll-grid">
+          <!-- Se puebla dinámicamente -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Explorador de Casos de Nivel 2 -->
+    <div class="tarjeta card-explorador-casos">
+      <div class="explorador-header">
+        <div>
+          <h3>📋 Expedientes de Casos Clasificados (Nivel 2)</h3>
+          <p class="sub-hint" id="contador-casos-filtrados">Mostrando 42 casos activos</p>
+        </div>
+
+        <!-- Barra de Filtros Avanzados -->
+        <div class="filtros-bar">
+          <div class="filtro-item">
+            <label for="filtro-busqueda">Buscar folio, parcela o municipio</label>
+            <input type="search" id="filtro-busqueda" placeholder="Ej. R-2055, P-094, Texcoco...">
+          </div>
+          <div class="filtro-item">
+            <label for="filtro-condicion">Condición Epidemiológica</label>
+            <select id="filtro-condicion">
+              <option value="todos">Todos los casos</option>
+              <option value="brote">🔥 Solo con BROTE activo</option>
+              <option value="cuarentenaria">⚠️ Plaga Cuarentenaria</option>
+              <option value="foto">📸 Reportes con Fotografía</option>
+              <option value="voz">🎙️ Reportes con Nota de Voz</option>
+              <option value="sin_tecnico">⏳ Sin técnico disponible</option>
+            </select>
+          </div>
+          <div class="filtro-item">
+            <label for="filtro-plaga-tec">Plaga Detectada</label>
+            <select id="filtro-plaga-tec">
+              <option value="todas">Todas las plagas (10)</option>
+            </select>
+          </div>
+          <div class="filtro-item">
+            <label for="filtro-tecnico-select">Técnico Asignado</label>
+            <select id="filtro-tecnico-select">
+              <option value="todos">Todos los técnicos (T-01..T-12)</option>
             </select>
           </div>
         </div>
-
-        <div class="dos">
-          <div class="campo">
-            <label for="cultivo">Cultivo Detectado</label>
-            <input id="cultivo" type="text" name="cultivo" readonly placeholder="Se autocompleta">
-          </div>
-          <div class="campo">
-            <label for="etapa">Etapa Fenológica</label>
-            <input id="etapa" type="text" name="etapa" readonly placeholder="Ej. V8">
-          </div>
-        </div>
-
-        <div class="campo">
-          <label for="plaga">Identificación de Plaga</label>
-          <select id="plaga" name="plaga" required>
-            <option value="">Selecciona o detecta plaga...</option>
-          </select>
-        </div>
-
-        <!-- Área de Marcado Geoespacial -->
-        <div class="campo">
-          <label>Delimitación del Área Afectada (Dibuja el cuadro/polígono en el mapa)</label>
-          <div class="metricas-geometria">
-            <div>Superficie Total: <strong id="superficie-total">0.0 ha</strong></div>
-            <div>Área Afectada: <strong id="ha-afectadas">0.0 ha</strong></div>
-            <div>Porcentaje de Daño: <strong id="porcentaje-afectado">0%</strong></div>
-          </div>
-          <input type="hidden" id="pct_hidden" name="porcentaje" value="10">
-        </div>
-
-        <!-- Semáforo Estimado en Tiempo Real -->
-        <div id="vista-previa-semaforo" class="tarjeta-semaforo s-desconocido">
-          <div class="indicador-circulo"></div>
-          <div>
-            <div class="tit-sem">Semáforo Calculado: <span id="nombre-semaforo">Pendiente</span></div>
-            <div class="sub-sem">Prioridad: <span id="puntos-prioridad">0</span>/100 · Visita: <span id="tiempo-visita">--</span></div>
-          </div>
-        </div>
-
-        <div class="campo">
-          <label for="observaciones">Observaciones o Síntomas</label>
-          <textarea id="observaciones" name="observaciones" rows="3" placeholder="Ej. Hojas raspadas en cogollo, presencia de aserrín..."></textarea>
-        </div>
-
-        <button type="submit" id="btn-enviar">Emitir Alerta & Registrar</button>
-        <p id="estado" class="estado" role="status"></p>
-      </form>
-    </section>
-
-    <!-- Columna Derecha: Mapa Interactivo y Casos Activos -->
-    <section class="panel-derecho">
-      <div class="tarjeta tarjeta-mapa">
-        <div class="mapa-header">
-          <h3>Mapa Satelital de la Parcela</h3>
-          <span class="ayuda-mapa">🖱️ Usa la herramienta de rectángulo en el mapa para marcar el daño</span>
-        </div>
-        <div id="mapa"></div>
       </div>
 
-      <div class="tarjeta tabla">
-        <h3>Historial de Alertas y Casos Procesados</h3>
-        <table id="registros">
+      <div class="tabla-responsive">
+        <table class="tabla-casos" id="tabla-casos-nivel2">
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Parcela</th>
-              <th>Cultivo</th>
-              <th>Plaga</th>
-              <th>% Daño</th>
-              <th>Semáforo</th>
+              <th>Folio & Fecha</th>
+              <th>Parcela & Ubicación</th>
+              <th>Cultivo & Etapa</th>
+              <th>Plaga Identificada</th>
+              <th>Prioridad & Semáforo</th>
+              <th>Estado Brote</th>
+              <th>Técnico Asignado</th>
+              <th>Evidencia</th>
+              <th>Acción</th>
             </tr>
           </thead>
-          <tbody>
-            <tr><td colspan="6">Sin registros recientes</td></tr>
+          <tbody id="tbody-casos-nivel2">
+            <!-- Filas generadas dinámicamente -->
           </tbody>
         </table>
       </div>
-    </section>
+    </div>
   </main>
+
+  <!-- ========================================================================
+       VISTA 2: PORTAL DEL AGRICULTOR (PRODUCTORES)
+       ======================================================================== -->
+  <section id="vista-agricultor" class="vista-contenedor oculto">
+    <!-- Banner de Bienvenida del Productor -->
+    <div class="section-banner banner-agricultor">
+      <div class="banner-left">
+        <span class="banner-tag">PORTAL DE ATENCIÓN AL PRODUCTOR · VALLE DE TEXCOCO Y REGIÓN ORIENTE</span>
+        <h2>Mi Parcela, Radar de Vecindad Fitosanitaria y Emisión de Reportes</h2>
+        <p>Consulta el estado sanitario de tus parcelas, revisa alertas de brotes cercanos a menos de 5 km y delimita áreas dañadas en el mapa satelital para recibir atención técnica prioritaria.</p>
+      </div>
+      <div class="selector-productor-box">
+        <label for="select-productor-activo">👨‍🌾 Productor en sesión:</label>
+        <select id="select-productor-activo">
+          <option value="PR-101">PR-101 · Fidel Jiménez (Texcoco)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tarjetas de Resumen del Productor Seleccionado -->
+    <div class="agricultor-status-grid">
+      <div class="tarjeta card-mi-parcela-info">
+        <div class="card-mini-head">
+          <span class="mini-badge">🌱 Parcela Seleccionada</span>
+          <span id="agr-parcela-municipio" class="mini-loc">Texcoco, Edo. Méx.</span>
+        </div>
+        <h3 id="agr-parcela-titulo">P-001 · Tlacotepec</h3>
+        <div class="agr-specs-row">
+          <div class="spec-pill"><span>Cultivo:</span> <strong id="agr-spec-cultivo">Maíz</strong></div>
+          <div class="spec-pill"><span>Etapa:</span> <strong id="agr-spec-etapa">V10</strong></div>
+          <div class="spec-pill"><span>Superficie:</span> <strong id="agr-spec-sup">5.5 ha</strong></div>
+        </div>
+        <div id="agr-estado-caso-actual" class="agr-alerta-box estado-limpio">
+          <!-- Se actualiza según si la parcela tiene caso activo -->
+        </div>
+      </div>
+
+      <div class="tarjeta card-radar-vecindad">
+        <div class="card-mini-head">
+          <span class="mini-badge badge-radar">📡 Radar Fitosanitario (&le; 5 km)</span>
+          <span id="agr-radar-count" class="mini-loc">0 alertas cercanas</span>
+        </div>
+        <h3>Vigilancia de Parcelas Vecinas (Últimos 7 días)</h3>
+        <div id="agr-lista-vecinos" class="vecinos-list">
+          <!-- Casos cercanos a <= 5 km -->
+        </div>
+      </div>
+
+      <div class="tarjeta card-mis-avisos">
+        <div class="card-mini-head">
+          <span class="mini-badge badge-buzon">📬 Mis Avisos Oficiales</span>
+          <span id="agr-avisos-count" class="mini-loc">Buzón de la Junta</span>
+        </div>
+        <h3>Notificaciones de Folio, Visita y Brotes</h3>
+        <div id="agr-lista-avisos" class="vecinos-list">
+          <!-- Avisos dirigidos a este productor o parcela -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Cuerpo Principal del Agricultor: Formulario + Mapa de Delimitación -->
+    <div class="agricultor-main-grid">
+      <!-- Columna Izquierda: Formulario de Reporte y Simulador de Reglas -->
+      <div class="tarjeta panel-formulario">
+        <div class="form-title-row">
+          <h2>📝 Reportar Afección en Mi Parcela</h2>
+          <span class="tag-ia">Motor Determinista Nivel 2</span>
+        </div>
+
+        <form id="registro">
+          <div class="dos">
+            <div class="campo">
+              <label for="fecha">Fecha del Reporte</label>
+              <input id="fecha" type="date" name="fecha" required>
+            </div>
+            <div class="campo">
+              <label for="parcela">Parcela Asignada (264 en catálogo)</label>
+              <select id="parcela" name="parcela" required>
+                <option value="">Cargando parcelas...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="dos">
+            <div class="campo">
+              <label for="cultivo">Cultivo Registrado</label>
+              <input id="cultivo" type="text" name="cultivo" readonly placeholder="Se autocompleta">
+            </div>
+            <div class="campo">
+              <label for="etapa">Etapa Fenológica</label>
+              <input id="etapa" type="text" name="etapa" readonly placeholder="Ej. V8">
+            </div>
+          </div>
+
+          <div class="campo">
+            <label for="plaga">Identificación de Plaga o Síntoma (10 Plagas Oficiales)</label>
+            <select id="plaga" name="plaga" required>
+              <option value="">Selecciona o detecta plaga...</option>
+            </select>
+          </div>
+
+          <!-- Guía Rápida de Síntomas de la Plaga Seleccionada -->
+          <div id="ficha-plaga-guia" class="ficha-plaga oculto">
+            <div class="ficha-plaga-top">
+              <div>
+                <strong id="ficha-plaga-nombre">Gusano cogollero</strong>
+                <em id="ficha-plaga-cientifico">Spodoptera frugiperda</em>
+              </div>
+              <span id="ficha-plaga-esp" class="badge-esp">Entomología</span>
+            </div>
+            <p class="ficha-sintomas-tit">Síntomas característicos en campo:</p>
+            <ul id="ficha-plaga-sintomas" class="ficha-sintomas-list"></ul>
+          </div>
+
+          <!-- Delimitación de Superficie Afectada (Mapa o Deslizador) -->
+          <div class="campo">
+            <div class="label-row">
+              <label for="slider-pct">Delimitación del Área Afectada (Dibuja en el mapa o ajusta el deslizador)</label>
+              <span class="pct-pill" id="porcentaje-afectado">10%</span>
+            </div>
+            <input type="range" id="slider-pct" min="1" max="100" value="10" class="range-pct">
+            <input type="hidden" id="pct_hidden" name="porcentaje" value="10">
+
+            <div class="metricas-geometria">
+              <div>Superficie Total: <strong id="superficie-total">0.0 ha</strong></div>
+              <div>Área Dañada: <strong id="ha-afectadas">0.00 ha</strong></div>
+              <div>Fracción aprox.: <strong id="fraccion-aprox">Décima parte</strong></div>
+            </div>
+          </div>
+
+          <!-- Tarjeta de Semáforo, Desglose de Puntos, Técnico Sugerido y Brote -->
+          <div id="vista-previa-semaforo" class="tarjeta-semaforo s-desconocido">
+            <div class="semaforo-top-row">
+              <div class="semaforo-main-badge">
+                <div class="indicador-circulo"></div>
+                <div>
+                  <div class="tit-sem">Semáforo: <span id="nombre-semaforo">PENDIENTE</span></div>
+                  <div class="sub-sem">Prioridad: <strong id="puntos-prioridad">0</strong>/100 pts · Atención en: <strong id="tiempo-visita">--</strong></div>
+                </div>
+              </div>
+              <div id="badge-sim-brote" class="sim-brote-badge">
+                Sin brote zonal
+              </div>
+            </div>
+
+            <!-- Barras de Desglose de la Fórmula Oficial (Sección 7) -->
+            <div class="desglose-factores">
+              <div class="factor-row">
+                <div class="factor-labels">
+                  <span>1. Factor Severidad de Plaga</span>
+                  <strong id="pts-severidad">0 / 50 pts</strong>
+                </div>
+                <div class="factor-bar-bg"><div id="bar-severidad" class="factor-bar-fill" style="width: 0%"></div></div>
+              </div>
+              <div class="factor-row">
+                <div class="factor-labels">
+                  <span>2. Factor Superficie Dañada</span>
+                  <strong id="pts-superficie">0 / 25 pts</strong>
+                </div>
+                <div class="factor-bar-bg"><div id="bar-superficie" class="factor-bar-fill" style="width: 0%"></div></div>
+              </div>
+              <div class="factor-row">
+                <div class="factor-labels">
+                  <span>3. Factor Etapa Fenológica</span>
+                  <strong id="pts-etapa">0 / 25 pts</strong>
+                </div>
+                <div class="factor-bar-bg"><div id="bar-etapa" class="factor-bar-fill" style="width: 0%"></div></div>
+              </div>
+            </div>
+
+            <!-- Técnico Asignado por Algoritmo Haversine -->
+            <div class="sim-tecnico-row" id="sim-tecnico-box">
+              <span class="sim-tec-icon">👨‍🔬</span>
+              <div class="sim-tec-info">
+                <span class="sim-tec-label">Técnico óptimo asignado (Regla Sección 8):</span>
+                <strong id="sim-tec-nombre">Selecciona una plaga para calcular asignación</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="campo">
+            <label for="observaciones">Observaciones o Síntomas en Campo</label>
+            <textarea id="observaciones" name="observaciones" rows="2" placeholder="Ej. Hojas perforadas en forma de ventana, presencia de aserrín en el cogollo..."></textarea>
+          </div>
+
+          <button type="submit" id="btn-enviar" class="btn-submit-glow">
+            🚀 Emitir Alerta Fitosanitaria & Guardar en Bitácora
+          </button>
+          <p id="estado" class="estado" role="status"></p>
+        </form>
+      </div>
+
+      <!-- Columna Derecha: Mapa Satelital de la Parcela + Historial de la Parcela -->
+      <div class="panel-derecho">
+        <div class="tarjeta tarjeta-mapa">
+          <div class="mapa-header">
+            <div>
+              <h3>🛰️ Mapa Satelital de Mi Parcela & Vecindad (5 km)</h3>
+              <p class="sub-hint">Dibuja un rectángulo con la herramienta superior izquierda del mapa para medir el área afectada automáticamente.</p>
+            </div>
+            <span class="ayuda-mapa">🖱️ Herramienta de dibujo activa</span>
+          </div>
+          <div id="mapa" class="mapa-lienzo"></div>
+        </div>
+
+        <div class="tarjeta tabla">
+          <div class="card-header-row">
+            <h3>📋 Historial Reciente de Alertas Emitidas</h3>
+            <span class="badge-mini-count" id="badge-count-registros">En vivo</span>
+          </div>
+          <div class="tabla-responsive">
+            <table id="registros">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Parcela</th>
+                  <th>Cultivo</th>
+                  <th>Plaga / Actividad</th>
+                  <th>% Daño</th>
+                  <th>Semáforo & Técnico</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="6">Cargando registros...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       VISTA 3: BITÁCORA FITOSANITARIA (SUPABASE) & BUZÓN DE AVISOS
+       ======================================================================== -->
+  <section id="vista-bitacora" class="vista-contenedor oculto">
+    <div class="section-banner banner-bitacora">
+      <div class="banner-left">
+        <span class="banner-tag">BITÁCORA DE PARCELA · SUPABASE & BUZÓN DE AVISOS</span>
+        <h2>Registro Histórico de Actividades en Parcela y Notificaciones Emitidas</h2>
+        <p>Consulta y registra actividades agronómicas en la tabla <code>registros</code> (sincronizada con Supabase y respaldo en servidor) y audita los avisos enviados a productores, técnicos y Sanidad Vegetal.</p>
+      </div>
+      <div class="banner-actions">
+        <button type="button" id="btn-exportar-csv" class="btn-secundario-accion">⬇️ Exportar Bitácora CSV</button>
+      </div>
+    </div>
+
+    <div class="bitacora-grid">
+      <!-- Formulario de Bitácora General (Compatible con la plantilla Supabase) -->
+      <div class="tarjeta">
+        <h3>📓 Nuevo Registro de Bitácora Agronómica</h3>
+        <p class="sub-hint">Registra labores culturales, muestreos o aplicaciones fitosanitarias en cualquier parcela.</p>
+        <form id="form-bitacora-directa" class="form-stack">
+          <div class="dos">
+            <div class="campo">
+              <label for="bit-fecha">Fecha</label>
+              <input type="date" id="bit-fecha" name="fecha" required>
+            </div>
+            <div class="campo">
+              <label for="bit-parcela">Parcela</label>
+              <select id="bit-parcela" name="parcela" required></select>
+            </div>
+          </div>
+          <div class="dos">
+            <div class="campo">
+              <label for="bit-cultivo">Cultivo</label>
+              <input type="text" id="bit-cultivo" name="cultivo" required placeholder="Ej. Maíz">
+            </div>
+            <div class="campo">
+              <label for="bit-actividad">Actividad Realizada</label>
+              <select id="bit-actividad" name="actividad" required>
+                <option value="Observación fitosanitaria">Observación fitosanitaria</option>
+                <option value="Muestreo de trampas y follaje">Muestreo de trampas y follaje</option>
+                <option value="Control biológico / Liberación de benéficos">Control biológico / Liberación de benéficos</option>
+                <option value="Aplicación focalizada autorizada">Aplicación focalizada autorizada</option>
+                <option value="Cerco sanitario por brote vecino">Cerco sanitario por brote vecino</option>
+                <option value="Riego y nutrición vegetal">Riego y nutrición vegetal</option>
+              </select>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="bit-observaciones">Observaciones de Campo</label>
+            <textarea id="bit-observaciones" name="observaciones" rows="3" placeholder="Describe los hallazgos, dosis o recomendaciones del técnico..."></textarea>
+          </div>
+          <button type="submit" class="btn-submit-glow">💾 Guardar en Bitácora (Supabase & Servidor)</button>
+          <p id="bit-estado" class="estado"></p>
+        </form>
+
+        <hr class="divisor-sutil">
+
+        <h3>📑 Registros Guardados en Bitácora</h3>
+        <div class="tabla-responsive">
+          <table class="tabla-casos" id="tabla-bitacora-general">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Parcela</th>
+                <th>Cultivo</th>
+                <th>Actividad</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-bitacora-general"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Columna Derecha: Buzón Oficial de Avisos (POST /avisos & Bot Telegram) -->
+      <div class="tarjeta">
+        <div class="card-header-row">
+          <div>
+            <h3>📡 Historial de Avisos Oficiales Emitidos (API & Telegram)</h3>
+            <p class="sub-hint">Notificaciones automáticas enviadas por <code>agente.py</code> vía <code>POST /avisos</code> y <code>@CoordinadorAlertasBot</code>.</p>
+          </div>
+          <select id="filtro-tipo-aviso" class="select-compacto">
+            <option value="todos">Todos los tipos</option>
+            <option value="brote">🔥 Alertas de Brote</option>
+            <option value="cuarentenaria">⚠️ Cuarentenarias</option>
+            <option value="asignacion">👨‍🔬 Asignación a Técnico</option>
+            <option value="folio">🎫 Acuse de Folio</option>
+          </select>
+        </div>
+        <div id="feed-avisos-oficiales" class="avisos-feed">
+          <!-- Poblado dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       MODAL INTERACTIVO DE EXPEDIENTE DE CASO (FOTOS, AUDIO Y MATEMÁTICA)
+       ======================================================================== -->
+  <div id="modal-expediente" class="modal-backdrop oculto" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <span class="badge-equipo" id="modal-folio-badge">EXPEDIENTE R-2001</span>
+          <h3 id="modal-titulo">Detalle Fitosanitario del Caso</h3>
+        </div>
+        <button type="button" id="btn-cerrar-modal" class="btn-close-modal" aria-label="Cerrar">&times;</button>
+      </div>
+      <div id="modal-cuerpo" class="modal-body">
+        <!-- Se inyecta dinámicamente el expediente completo -->
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/src/main.js"></script>
 </body>
