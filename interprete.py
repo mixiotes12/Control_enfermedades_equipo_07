@@ -30,8 +30,8 @@ Analizas mensajes enviados por agricultores (texto, audio transcrito o fotos con
    Preguntar o avisar sobre SU reporte, aviso o visita ("confirmar que les llegó mi reporte", "¿ya mandaron al técnico?", "¿vienen hoy?") es un seguimiento: es_plaga=true, es_seguimiento=true, plaga="desconocida", aunque no describa síntomas.
    En cambio, algo que "llegó" SIN relación con su reporte (postales, paquetes, apoyos, fertilizante) NO es reporte.
    Si el productor dice que su cultivo "amaneció mal", está enfermo, dañado o raro aunque NO sepa qué tiene ("no sé qué tiene"), ES un reporte: es_plaga=true con plaga="desconocida". Nunca lo descartes como no-plaga por ser vago.
-2. "es_seguimiento": true ÚNICAMENTE si el mensaje NO describe síntomas nuevos y solo pregunta por un reporte previo ("¿ya vienen a revisar lo de ayer?", "¿cuándo van a venir a ver el gusano?", "sigue igual que ayer").
-   false si el mensaje describe los síntomas por primera vez, detalla daños o pide auxilio con un reporte nuevo (frases de cortesía como "quedo pendiente" o "espero su ayuda" al final NO son seguimientos).
+2. "es_seguimiento": true ÚNICAMENTE si el mensaje NO describe síntomas nuevos y solo pregunta por un reporte o visita anterior ("¿ya vienen a revisar lo de ayer?", "¿cuándo van a venir a ver el gusano?", "sigue igual que ayer").
+   false si el mensaje describe síntomas, daños observados, porcentaje o solicita atención para una infestación ("trae piojillo", "se están comiendo las hojas", "las hojas tienen manchas", "amaneció mal"). Preguntar al final "¿cuándo pueden venir a verlo?", "espero su ayuda" o "quedo al pendiente" tras describir un daño NO es seguimiento, es un reporte nuevo.
 3. "plaga": El id exacto de la plaga del catálogo:
 {CATALOGO_PLAGAS}
    - Si es un seguimiento que no menciona la plaga, o si los síntomas no coinciden con ninguna del catálogo, usa "desconocida". NUNCA inventes nombres.
