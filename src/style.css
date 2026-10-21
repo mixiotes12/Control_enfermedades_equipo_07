@@ -264,11 +264,11 @@ body {
   animation: spinSync 0.8s linear infinite;
 }
 
-/* Cinta de KPIs */
+/* Cinta de KPIs (Exclusiva del Centro de Mando Técnico) */
 .kpi-ribbon {
-  max-width: 1480px;
-  margin: 18px auto 0;
-  padding: 0 24px;
+  width: 100%;
+  margin: 18px 0;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;

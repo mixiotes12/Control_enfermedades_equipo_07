@@ -417,12 +417,6 @@ function cambiarVista(nuevaVista, actualizarHistorial = true) {
     bitacora: document.querySelector("#vista-bitacora"),
   };
 
-  const kpiRibbon = document.querySelector(".kpi-ribbon");
-  if (kpiRibbon) {
-    // Ocultar ribbon general en la landing (la landing tiene sus propios KPIs de pie)
-    kpiRibbon.classList.toggle("oculto", nuevaVista === "landing");
-  }
-
   // Control de navegación interna de coordinación en cabecera
   const navCoord = document.querySelector("#nav-coordinador");
   if (navCoord) {

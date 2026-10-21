@@ -239,52 +239,6 @@
       </div>
     </div>
   </div>
-  <section class="kpi-ribbon oculto" aria-label="Resumen ejecutivo en tiempo real">
-    <div class="kpi-card kpi-total">
-      <div class="kpi-icon-wrap">📊</div>
-      <div class="kpi-info">
-        <span class="kpi-title">Casos Nivel 2 Procesados</span>
-        <div class="kpi-value-row">
-          <strong class="kpi-number" id="kpi-total-casos">42</strong>
-          <span class="kpi-chip" id="kpi-sub-previos">+40 históricos</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="kpi-card kpi-criticos">
-      <div class="kpi-icon-wrap">🚨</div>
-      <div class="kpi-info">
-        <span class="kpi-title">Urgencia Alta (Rojo / Naranja)</span>
-        <div class="kpi-value-row">
-          <strong class="kpi-number" id="kpi-urgentes">0</strong>
-          <span class="kpi-chip chip-danger" id="kpi-cuarentenarias">0 cuarentenarias</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="kpi-card kpi-brotes">
-      <div class="kpi-icon-wrap">🔥</div>
-      <div class="kpi-info">
-        <span class="kpi-title">Brotes Activos (&le; 5 km / 7d)</span>
-        <div class="kpi-value-row">
-          <strong class="kpi-number" id="kpi-brotes-count">0</strong>
-          <span class="kpi-chip chip-warning">Cerco epidemiológico</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="kpi-card kpi-tecnicos">
-      <div class="kpi-icon-wrap">👨‍🔬</div>
-      <div class="kpi-info">
-        <span class="kpi-title">Fuerza Técnica Desplegada</span>
-        <div class="kpi-value-row">
-          <strong class="kpi-number" id="kpi-tecnicos-activos">12</strong>
-          <span class="kpi-chip chip-info" id="kpi-avisos-total">105 avisos emitidos</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- ========================================================================
        VISTA 1: CENTRO DE CONTROL TÉCNICO & COORDINACIÓN (NIVEL 2)
        ======================================================================== -->
@@ -314,6 +268,53 @@
         </button>
       </div>
     </div>
+
+    <!-- Cinta de Métricas Operativas Regionales (Exclusiva de Coordinación) -->
+    <section class="kpi-ribbon" aria-label="Resumen ejecutivo en tiempo real">
+      <div class="kpi-card kpi-total">
+        <div class="kpi-icon-wrap">📊</div>
+        <div class="kpi-info">
+          <span class="kpi-title">Casos Nivel 2 Procesados</span>
+          <div class="kpi-value-row">
+            <strong class="kpi-number" id="kpi-total-casos">42</strong>
+            <span class="kpi-chip" id="kpi-sub-previos">+40 históricos</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-criticos">
+        <div class="kpi-icon-wrap">🚨</div>
+        <div class="kpi-info">
+          <span class="kpi-title">Urgencia Alta (Rojo / Naranja)</span>
+          <div class="kpi-value-row">
+            <strong class="kpi-number" id="kpi-urgentes">0</strong>
+            <span class="kpi-chip chip-danger" id="kpi-cuarentenarias">0 cuarentenarias</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-brotes">
+        <div class="kpi-icon-wrap">🔥</div>
+        <div class="kpi-info">
+          <span class="kpi-title">Brotes Activos (&le; 5 km / 7d)</span>
+          <div class="kpi-value-row">
+            <strong class="kpi-number" id="kpi-brotes-count">0</strong>
+            <span class="kpi-chip chip-warning">Cerco epidemiológico</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-tecnicos">
+        <div class="kpi-icon-wrap">👨‍🔬</div>
+        <div class="kpi-info">
+          <span class="kpi-title">Fuerza Técnica Desplegada</span>
+          <div class="kpi-value-row">
+            <strong class="kpi-number" id="kpi-tecnicos-activos">12</strong>
+            <span class="kpi-chip chip-info" id="kpi-avisos-total">105 avisos emitidos</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- Grid Superior Técnico: Mapa Táctico + Panel de Técnicos -->
     <div class="tecnico-top-grid">
