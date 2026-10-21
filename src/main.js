@@ -322,50 +322,31 @@ const layerTecnicosBases = L.layerGroup().addTo(mapTecnico);
 const layerRutasTecnicos = L.layerGroup().addTo(mapTecnico);
 
 // ============================================================================
-// MAPA 2: MAPA SATELITAL DE PARCELA (VISTA AGRICULTOR)
+// MAPA 2: MAPA SATELITAL DE PARCELA (VISTA AGRICULTOR - FIJO Y CENTRADO)
 // ============================================================================
-const mapAgricultor = L.map("mapa").setView([19.5104, -98.8824], 15);
+const mapAgricultor = L.map("mapa", {
+  attributionControl: false,
+  zoomControl: true,
+}).setView([19.5104, -98.8824], 16);
+
+// Capa satelital de alta resolución (Esri World Imagery)
 L.tileLayer(
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  { attribution: "Tiles &copy; Esri" },
+  { maxZoom: 18, attribution: "Esri Satellite" },
 ).addTo(mapAgricultor);
 
-const drawnItems = new L.FeatureGroup();
-mapAgricultor.addLayer(drawnItems);
-const layerVecinosAgr = L.layerGroup().addTo(mapAgricultor);
+// Capa de referencias geográficas y caminos (alto contraste)
+L.tileLayer(
+  "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+  { maxZoom: 18, opacity: 0.75 },
+).addTo(mapAgricultor);
 
 let poligonoParcela = null;
-let circuloRadar5km = null;
-let rectanguloAfectado = null;
+let marcadorDanio = null;
+let circuloDanio = null;
+let puntoDanioActual = null;
+let pctDanioActual = 10;
 
-const drawControl = new L.Control.Draw({
-  draw: {
-    polygon: false,
-    polyline: false,
-    circle: false,
-    marker: false,
-    circlemarker: false,
-    rectangle: {
-      shapeOptions: {
-        color: "#ef4444",
-        weight: 2,
-        fillOpacity: 0.42,
-      },
-    },
-  },
-  edit: {
-    featureGroup: drawnItems,
-    edit: false,
-  },
-});
-mapAgricultor.addControl(drawControl);
-
-mapAgricultor.on(L.Draw.Event.CREATED, (e) => {
-  drawnItems.clearLayers();
-  rectanguloAfectado = e.layer;
-  drawnItems.addLayer(rectanguloAfectado);
-  calcularAreaAfectadaPorDibujo();
-});
 
 // ============================================================================
 // CONMUTADOR DE VISTAS Y ENRUTAMIENTO SPA (LANDING / TÉCNICO / AGRICULTOR / BITÁCORA)
@@ -377,8 +358,15 @@ function resolverVistaDesdeUrl() {
 
   if (path.includes("agricultor") || hash.includes("agricultor")) {
     if (!sesion || sesion.rol !== "agricultor") {
-      setTimeout(() => abrirModalAuthAgricultor(), 150);
-      return "landing";
+      const prod = mapaProductores.get("PR-101");
+      const sesionDefault = {
+        rol: "agricultor",
+        id: "PR-101",
+        nombre: prod?.nombre || "Fidel Jiménez",
+        municipio: prod?.municipio || "Texcoco",
+      };
+      guardarSesion(sesionDefault);
+      aplicarSesion(sesionDefault);
     }
     return "agricultor";
   }
@@ -532,10 +520,18 @@ function aplicarSesion(sesion) {
   actualizarBadgeSesion(sesion);
   if (sesion.rol === "agricultor" && sesion.id) {
     estadoApp.productorActualId = sesion.id;
-    if (selectProductorActivo) selectProductorActivo.value = sesion.id;
-    poblarSelectoresCatalogo();
     const prod = mapaProductores.get(sesion.id);
-    const primeraParcela = prod?.parcelas?.[0];
+    const nombreProd = sesion.nombre || prod?.nombre || `Productor ${sesion.id}`;
+    const munProd = prod?.municipio || sesion.municipio || "Texcoco, Edo. Méx.";
+
+    const elNombre = document.querySelector("#agr-productor-nombre");
+    const elId = document.querySelector("#agr-productor-id");
+    if (elNombre) elNombre.textContent = nombreProd;
+    if (elId) elId.textContent = `Clave: ${sesion.id} · ${munProd}`;
+
+    renderizarPestanasParcelasProductor(sesion.id);
+
+    const primeraParcela = prod?.parcelas?.[0] || estadoApp.parcelas[0]?.id;
     if (primeraParcela) seleccionarParcelaAgricultor(primeraParcela);
   } else if (sesion.rol === "coordinador" || sesion.rol === "tecnico") {
     const tecId = sesion.id || "todos";
@@ -1230,76 +1226,23 @@ window.addEventListener("keydown", (e) => {
 });
 
 // ============================================================================
-// VISTA 2: PORTAL DEL AGRICULTOR (PRODUCTORES, RADAR 5 KM Y SIMULADOR)
+// VISTA 2: PORTAL DEL AGRICULTOR (ASISTENTE CONVERSACIONAL Y MAPA DE PARCELA)
 // ============================================================================
-const selectProductorActivo = document.querySelector("#select-productor-activo");
-const selectParcela = document.querySelector("#parcela");
-const selectPlaga = document.querySelector("#plaga");
-const inputCultivo = document.querySelector("#cultivo");
-const inputEtapa = document.querySelector("#etapa");
-const inputFecha = document.querySelector("#fecha");
-const sliderPct = document.querySelector("#slider-pct");
-const inputPct = document.querySelector("#pct_hidden");
-const txtSuperficieTotal = document.querySelector("#superficie-total");
-const txtHaAfectadas = document.querySelector("#ha-afectadas");
-const txtPorcentaje = document.querySelector("#porcentaje-afectado");
-const txtFraccion = document.querySelector("#fraccion-aprox");
-const vistaSemaforo = document.querySelector("#vista-previa-semaforo");
-const txtNombreSemaforo = document.querySelector("#nombre-semaforo");
-const txtPuntosPrioridad = document.querySelector("#puntos-prioridad");
-const txtTiempoVisita = document.querySelector("#tiempo-visita");
+const chatHistorialParcelas = new Map(); // key = parcelaId -> array de mensajes
+let fotoAdjuntaActual = null;
+let audioAdjuntoActual = null;
+let grabacionActiva = false;
+let mediaRecorder = null;
+let audioChunks = [];
+let grabacionTimer = null;
+let grabacionSegundos = 0;
 
 function poblarSelectoresCatalogo() {
-  // 1. Selector de Productores en Portal Agricultor (priorizando los que tienen casos activos)
-  const productoresConCaso = new Set();
-  for (const c of estadoApp.casosHistorial) {
-    const p = mapaParcelas.get(c.parcela_id);
-    if (p?.productor_id) productoresConCaso.add(p.productor_id);
-  }
-
-  if (selectProductorActivo) {
-    selectProductorActivo.innerHTML = "";
-    const listaProd = [...estadoApp.productores].sort((a, b) => {
-      const aCaso = productoresConCaso.has(a.id) ? 0 : 1;
-      const bCaso = productoresConCaso.has(b.id) ? 0 : 1;
-      if (aCaso !== bCaso) return aCaso - bCaso;
-      return a.id.localeCompare(b.id);
-    });
-    for (const pr of listaProd) {
-      const tieneAlerta = productoresConCaso.has(pr.id);
-      const opt = document.createElement("option");
-      opt.value = pr.id;
-      opt.textContent = `${pr.id} · ${pr.nombre} (${pr.municipio}) ${tieneAlerta ? "⚠️ Con caso activo" : ""}`;
-      selectProductorActivo.appendChild(opt);
-    }
-    selectProductorActivo.value = estadoApp.productorActualId;
-  }
-
-  // 2. Selector de Parcelas en Formulario Agricultor y Bitácora
+  // Selector de Parcelas en Bitácora General (Vista 3)
   const selBitParcela = document.querySelector("#bit-parcela");
-  if (selectParcela) selectParcela.innerHTML = "";
-  if (selBitParcela) selBitParcela.innerHTML = "";
-
-  // Ordenar parcelas poniendo primero las del productor en sesión
-  const prodActual = mapaProductores.get(estadoApp.productorActualId);
-  const parcelasProdSet = new Set(prodActual?.parcelas || []);
-
-  const parcelasOrdenadas = [...estadoApp.parcelas].sort((a, b) => {
-    const aMia = parcelasProdSet.has(a.id) ? 0 : 1;
-    const bMia = parcelasProdSet.has(b.id) ? 0 : 1;
-    if (aMia !== bMia) return aMia - bMia;
-    return a.id.localeCompare(b.id);
-  });
-
-  for (const p of parcelasOrdenadas) {
-    const etiqueta = `${parcelasProdSet.has(p.id) ? "⭐ " : ""}${p.id} - ${p.nombre} (${p.municipio} · ${p.cultivo}, ${p.superficie_ha} ha)`;
-    if (selectParcela) {
-      const opt = document.createElement("option");
-      opt.value = p.id;
-      opt.textContent = etiqueta;
-      selectParcela.appendChild(opt);
-    }
-    if (selBitParcela) {
+  if (selBitParcela) {
+    selBitParcela.innerHTML = "";
+    for (const p of estadoApp.parcelas) {
       const opt2 = document.createElement("option");
       opt2.value = `${p.id} · ${p.nombre} (${p.municipio})`;
       opt2.dataset.cultivo = p.cultivo;
@@ -1308,23 +1251,11 @@ function poblarSelectoresCatalogo() {
     }
   }
 
-  // 3. Selector de las 10 Plagas Oficiales
+  // Selector de las 10 Plagas Oficiales (Filtro del Centro de Mando Técnico)
   const filtroPlagaTec = document.querySelector("#filtro-plaga-tec");
-  if (selectPlaga) {
-    selectPlaga.innerHTML = '<option value="">-- Selecciona la Plaga Detectada --</option>';
-  }
   if (filtroPlagaTec) {
     filtroPlagaTec.innerHTML = '<option value="todas">Todas las plagas (10)</option>';
-  }
-
-  for (const pl of estadoApp.plagas) {
-    if (selectPlaga) {
-      const opt = document.createElement("option");
-      opt.value = pl.id;
-      opt.textContent = `${pl.nombre} (${pl.severidad.toUpperCase()}${pl.cuarentenaria ? " · ⚠️ CUARENTENARIA" : ""})`;
-      selectPlaga.appendChild(opt);
-    }
-    if (filtroPlagaTec) {
+    for (const pl of estadoApp.plagas) {
       const optF = document.createElement("option");
       optF.value = pl.id;
       optF.textContent = pl.nombre;
@@ -1332,7 +1263,7 @@ function poblarSelectoresCatalogo() {
     }
   }
 
-  // 4. Selector de Técnicos en filtro de coordinación
+  // Selector de Técnicos en filtro de coordinación
   const filtroTecSel = document.querySelector("#filtro-tecnico-select");
   if (filtroTecSel) {
     filtroTecSel.innerHTML = '<option value="todos">Todos los técnicos (T-01..T-12)</option>';
@@ -1345,141 +1276,175 @@ function poblarSelectoresCatalogo() {
   }
 }
 
+// R3: Aislamiento total de las parcelas del productor autenticado
+function renderizarPestanasParcelasProductor(productorId) {
+  const cont = document.querySelector("#agr-parcelas-tabs");
+  if (!cont) return;
+  cont.innerHTML = "";
+
+  const prod = mapaProductores.get(productorId);
+  const parcelasIds = prod?.parcelas || [];
+
+  if (parcelasIds.length === 0) {
+    cont.innerHTML = '<span class="sub-hint">No hay parcelas registradas para este productor.</span>';
+    return;
+  }
+
+  const activaId = estadoApp.parcelaActual?.id || parcelasIds[0];
+
+  parcelasIds.forEach((pId) => {
+    const p = mapaParcelas.get(pId);
+    if (!p) return;
+    const esActiva = p.id === activaId;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `parcela-tab ${esActiva ? "active" : ""}`;
+    btn.dataset.parcela = p.id;
+    btn.innerHTML = `
+      <span class="tab-icon">🌱</span>
+      <span class="tab-info">
+        <strong>${p.id} · ${p.nombre}</strong>
+        <small>${p.cultivo} · ${p.superficie_ha} ha · Etapa ${p.etapa}</small>
+      </span>
+    `;
+    btn.addEventListener("click", () => {
+      seleccionarParcelaAgricultor(p.id);
+    });
+    cont.appendChild(btn);
+  });
+}
+
+// R3: Solo mostrar si hay visita técnica agendada o aviso crítico directo
+function actualizarBannerVisitaParcela(parcelaId) {
+  const box = document.querySelector("#agr-visita-status");
+  if (!box) return;
+
+  const casoActivo = estadoApp.casosHistorial.find((c) => c.parcela_id === parcelaId);
+  const p = mapaParcelas.get(parcelaId);
+
+  if (casoActivo && p) {
+    const tec = mapaTecnicos.get(casoActivo.tecnico_id);
+    const tiempoVisita = casoActivo.prioridad >= 85 ? "menos de 24 horas" : casoActivo.prioridad >= 70 ? "menos de 48 horas" : "menos de 72 horas";
+    box.innerHTML = `
+      <div class="visita-card visita-activa">
+        <div class="visita-icon">📅</div>
+        <div class="visita-content">
+          <div class="visita-top">
+            <span class="badge-visita-urgente">VISITA TÉCNICA PROGRAMADA · FOLIO ${casoActivo.reporte_id}</span>
+            <span class="visita-tiempo">⏱️ Tiempo estimado: ${tiempoVisita}</span>
+          </div>
+          <h4>${nombreLegiblePlaga(casoActivo.plaga)} en cultivo de ${p.cultivo} · Semáforo ${casoActivo.semaforo.toUpperCase()} (${casoActivo.prioridad} pts)</h4>
+          <p>
+            Atención prioritaria asignada a <strong>${tec ? `${tec.nombre} (${tec.especialidad} · Base ${tec.base})` : "Técnico especialista de la Junta Local"}</strong>.
+            ${casoActivo.brote ? " · ⚠️ <b>Alerta de Brote Zonal activa</b>." : ""}
+            Favor de mantener libre acceso al predio.
+          </p>
+        </div>
+      </div>
+    `;
+  } else {
+    box.innerHTML = `
+      <div class="visita-card visita-limpia">
+        <div class="visita-icon">✅</div>
+        <div class="visita-content">
+          <div class="visita-top">
+            <span class="badge-visita-ok">ESTADO SANITARIO MONITOREADO</span>
+          </div>
+          <h4>Sin reportes críticos abiertos en esta parcela</h4>
+          <p>Tu cultivo se encuentra protegido. Si observas hojas mordidas, manchas o presencia de larvas, descríbelo en el chat o envía una foto/audio abajo.</p>
+        </div>
+      </div>
+    `;
+  }
+}
+
+// R2: Marcador táctil de daño y círculo proporcional de área afectada
+function actualizarMarcadorDanio(coords, pct) {
+  pctDanioActual = Math.max(1, Math.min(100, Number(pct) || 10));
+  const p = estadoApp.parcelaActual;
+  const supTotal = Number(p?.superficie_ha) || 1;
+  const haDanadas = (supTotal * pctDanioActual) / 100;
+
+  // Actualizar indicadores visuales
+  const metricsTxt = document.querySelector("#mapa-metrics-txt");
+  if (metricsTxt) {
+    metricsTxt.innerHTML = `Área afectada: <strong>${pctDanioActual}%</strong> (~${haDanadas.toFixed(2)} ha de ${supTotal} ha)`;
+  }
+
+  const slider = document.querySelector("#mapa-slider-pct");
+  if (slider && Number(slider.value) !== pctDanioActual) {
+    slider.value = String(pctDanioActual);
+  }
+
+  const sliderVal = document.querySelector("#mapa-slider-val");
+  if (sliderVal) {
+    sliderVal.textContent = `${pctDanioActual}%`;
+  }
+
+  // Actualizar chips rápidos activos
+  document.querySelectorAll(".btn-danio-chip").forEach((btn) => {
+    btn.classList.toggle("active", Number(btn.dataset.pct) === pctDanioActual);
+  });
+
+  if (!coords || !mapAgricultor) return;
+
+  // Actualizar o crear marcador visual de afección
+  if (marcadorDanio) {
+    marcadorDanio.setLatLng(coords);
+  } else {
+    const pinIcon = L.divIcon({
+      className: "danio-pin-wrapper",
+      html: `
+        <div class="danio-pin-core">
+          <span class="danio-pin-pulse"></span>
+          <span class="danio-pin-dot">⚠️</span>
+        </div>
+      `,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+    marcadorDanio = L.marker(coords, { icon: pinIcon }).addTo(mapAgricultor);
+  }
+
+  // Radio del círculo en metros basado en hectáreas afectadas
+  const radioMetros = Math.max(15, Math.round(Math.sqrt((haDanadas * 10000) / Math.PI)));
+
+  if (circuloDanio) {
+    circuloDanio.setLatLng(coords);
+    circuloDanio.setRadius(radioMetros);
+  } else {
+    circuloDanio = L.circle(coords, {
+      radius: radioMetros,
+      color: "#ef4444",
+      weight: 2,
+      dashArray: "4, 4",
+      fillColor: "#f87171",
+      fillOpacity: 0.38,
+    }).addTo(mapAgricultor);
+  }
+}
+
+// R2 y R3: Selección de Parcela fija y centrada con bloqueo en perímetro
 function seleccionarParcelaAgricultor(parcelaId) {
   const p = mapaParcelas.get(parcelaId) || estadoApp.parcelas[0];
   if (!p) return;
   estadoApp.parcelaActual = p;
 
-  if (selectParcela && selectParcela.value !== p.id) {
-    selectParcela.value = p.id;
-  }
-  if (p.productor_id && selectProductorActivo && selectProductorActivo.value !== p.productor_id) {
-    estadoApp.productorActualId = p.productor_id;
-    selectProductorActivo.value = p.productor_id;
-  }
+  // Actualizar selector de pestañas del productor
+  document.querySelectorAll(".parcela-tab").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.parcela === p.id);
+  });
 
-  inputCultivo.value = p.cultivo;
-  inputEtapa.value = p.etapa;
-  txtSuperficieTotal.textContent = `${p.superficie_ha} ha`;
-
-  // Actualizar tarjeta de estado de la parcela del agricultor
-  document.querySelector("#agr-parcela-municipio").textContent = `${p.municipio}, Edo. Méx.`;
-  document.querySelector("#agr-parcela-titulo").textContent = `${p.id} · ${p.nombre}`;
-  document.querySelector("#agr-spec-cultivo").textContent = p.cultivo;
-  document.querySelector("#agr-spec-etapa").textContent = p.etapa;
-  document.querySelector("#agr-spec-sup").textContent = `${p.superficie_ha} ha`;
-
-  const casoActivo = estadoApp.casosHistorial.find((c) => c.parcela_id === p.id);
-  const boxEstado = document.querySelector("#agr-estado-caso-actual");
-  if (boxEstado) {
-    if (casoActivo) {
-      const tec = mapaTecnicos.get(casoActivo.tecnico_id);
-      boxEstado.className = "agr-alerta-box estado-con-caso";
-      boxEstado.innerHTML = `
-        <strong>⚠️ Caso Activo (${casoActivo.reporte_id}):</strong> ${nombreLegiblePlaga(casoActivo.plaga)} ·
-        Semáforo <b>${casoActivo.semaforo.toUpperCase()}</b> (${casoActivo.prioridad} pts).<br/>
-        👨‍🔬 Atiende: <b>${tec ? `${tec.nombre} (${tec.id})` : "En asignación"}</b>
-        ${casoActivo.brote ? " · 🔥 <b>Zona con Brote Activo</b>" : ""}
-      `;
-    } else {
-      boxEstado.className = "agr-alerta-box estado-limpio";
-      boxEstado.innerHTML = `
-        ✅ <strong>Sin reportes críticos abiertos en esta parcela.</strong><br/>
-        Puedes realizar un monitoreo preventivo o reportar síntomas abajo.
-      `;
-    }
+  // Actualizar badge en la cabecera del chat
+  const chatBadge = document.querySelector("#chat-parcela-badge");
+  if (chatBadge) {
+    chatBadge.textContent = `🌱 Parcela ${p.id} · ${p.nombre} (${p.cultivo})`;
   }
 
-  // Radar de Vecindad (casos a <= 5 km de esta parcela en los últimos 7 días)
-  const todosCasos = [...estadoApp.casosHistorial, ...estadoApp.casosPrevios];
-  const tRefRadar = casoActivo?.recibido
-    ? new Date(casoActivo.recibido).getTime()
-    : new Date(obtenerMomentoReferenciaIso()).getTime();
-  const casosCercanos = [];
-  layerVecinosAgr.clearLayers();
+  // Actualizar tarjeta de visita
+  actualizarBannerVisitaParcela(p.id);
 
-  for (const c of todosCasos) {
-    if (c.parcela_id === p.id || c.plaga === "desconocida") continue;
-    const dist = haversineKm(Number(p.lat), Number(p.lon), Number(c.lat), Number(c.lon));
-    if (dist <= 5.0) {
-      if (c.recibido && !Number.isNaN(tRefRadar)) {
-        const diffDias = (tRefRadar - new Date(c.recibido).getTime()) / 86400000;
-        if (diffDias < -1.0 || diffDias > 7.0) continue;
-      }
-      casosCercanos.push({ ...c, distKm: dist });
-      const colorV = colorHexSemaforo(c.semaforo);
-      L.circleMarker([Number(c.lat), Number(c.lon)], {
-        radius: 7,
-        color: "#ffffff",
-        weight: 1.5,
-        fillColor: colorV,
-        fillOpacity: 0.9,
-      })
-        .bindTooltip(
-          `Vecino ${c.parcela_id}: ${nombreLegiblePlaga(c.plaga)} (${dist.toFixed(2)} km) · Semáforo ${c.semaforo}`,
-        )
-        .addTo(layerVecinosAgr);
-    }
-  }
-  casosCercanos.sort((a, b) => a.distKm - b.distKm);
-
-  const radarCount = document.querySelector("#agr-radar-count");
-  const listaVecinos = document.querySelector("#agr-lista-vecinos");
-  if (radarCount) radarCount.textContent = `${casosCercanos.length} caso${casosCercanos.length === 1 ? "" : "s"} a ≤ 5 km`;
-  if (listaVecinos) {
-    if (casosCercanos.length === 0) {
-      listaVecinos.innerHTML = `<div class="vecino-item"><span>🌿 Sin alertas reportadas en un radio de 5 km.</span></div>`;
-    } else {
-      listaVecinos.innerHTML = casosCercanos
-        .map(
-          (v) => `
-          <div class="vecino-item">
-            <div>
-              <strong>${v.parcela_id} · ${nombreLegiblePlaga(v.plaga)}</strong>
-              <span class="fecha-sub">A ${v.distKm.toFixed(2)} km de tu parcela ${v.brote ? "· 🔥 Brote" : ""}</span>
-            </div>
-            <span class="tag-sem tag-${v.semaforo}">${v.semaforo}</span>
-          </div>
-        `,
-        )
-        .join("");
-    }
-  }
-
-  // Avisos recibidos por este productor
-  const misAvisos = estadoApp.avisos.filter(
-    (a) =>
-      (Array.isArray(a.para) && a.para.includes(p.productor_id)) ||
-      (casoActivo && a.reporte_id === casoActivo.reporte_id),
-  );
-  const listaAvisosAgr = document.querySelector("#agr-lista-avisos");
-  const countAvisosAgr = document.querySelector("#agr-avisos-count");
-  if (countAvisosAgr) countAvisosAgr.textContent = `${misAvisos.length} notificación(es)`;
-  if (listaAvisosAgr) {
-    if (misAvisos.length === 0) {
-      listaAvisosAgr.innerHTML = `<div class="vecino-item"><span>📭 No tienes avisos pendientes en este momento.</span></div>`;
-    } else {
-      listaAvisosAgr.innerHTML = misAvisos
-        .map(
-          (av) => `
-          <div class="vecino-item">
-            <div>
-              <strong style="color:#38bdf8; text-transform:uppercase; font-size:10.5px;">[${av.tipo}]</strong>
-              <span>${av.mensaje}</span>
-            </div>
-          </div>
-        `,
-        )
-        .join("");
-    }
-  }
-
-  // Centrar mapa del agricultor y dibujar polígono de su parcela + radio de 5 km
-  mapAgricultor.setView([Number(p.lat), Number(p.lon)], 15);
-  if (poligonoParcela) mapAgricultor.removeLayer(poligonoParcela);
-  if (circuloRadar5km) mapAgricultor.removeLayer(circuloRadar5km);
-  drawnItems.clearLayers();
-
+  // R2: Centrado y fijación estricta en las coordenadas de la parcela
   const ladoMetros = Math.sqrt(Number(p.superficie_ha) * 10000);
   const deltaLat = ladoMetros / 111320 / 2;
   const deltaLon = ladoMetros / (111320 * Math.cos((Number(p.lat) * Math.PI) / 180)) / 2;
@@ -1489,149 +1454,696 @@ function seleccionarParcelaAgricultor(parcelaId) {
     [Number(p.lat) + deltaLat, Number(p.lon) + deltaLon],
   ];
 
+  mapAgricultor.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+
+  // Bloquear navegación fuera de la parcela
+  const maxBounds = L.latLngBounds(bounds).pad(1.2);
+  mapAgricultor.setMaxBounds(maxBounds);
+  mapAgricultor.setMinZoom(14);
+  mapAgricultor.setMaxZoom(18);
+
+  // Polígono estético de la parcela con brillo esmeralda
+  if (poligonoParcela) mapAgricultor.removeLayer(poligonoParcela);
   poligonoParcela = L.rectangle(bounds, {
     color: "#10b981",
-    weight: 2.5,
-    fillOpacity: 0.18,
-    dashArray: "5, 5",
+    weight: 3,
+    fillColor: "#059669",
+    fillOpacity: 0.22,
   }).addTo(mapAgricultor);
 
-  poligonoParcela.bindTooltip(`Parcela ${p.id}: ${p.nombre} (${p.superficie_ha} ha)`, {
+  poligonoParcela.bindTooltip(`🌱 Parcela ${p.id}: ${p.nombre} (${p.superficie_ha} ha · ${p.cultivo})`, {
     permanent: true,
     direction: "top",
+    className: "parcela-tooltip-label",
   });
 
-  circuloRadar5km = L.circle([Number(p.lat), Number(p.lon)], {
-    radius: 5000,
-    color: "#38bdf8",
-    weight: 1,
-    dashArray: "4, 6",
-    fillOpacity: 0.02,
-  }).addTo(mapAgricultor);
+  poligonoParcela.on("click", (e) => {
+    puntoDanioActual = [e.latlng.lat, e.latlng.lng];
+    actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
+    mostrarToast(`📍 Foco de afección marcado en la parcela (${pctDanioActual}%)`);
+  });
 
-  actualizarSimuladorAgricultor();
+  // Colocar o centrar foco de daño en la parcela
+  puntoDanioActual = [Number(p.lat), Number(p.lon)];
+  actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
+
+  // Inicializar o refrescar chat conversacional para esta parcela
+  iniciarChatParaParcela(p);
 }
 
-function describirFraccion(pct) {
-  if (pct >= 90) return "Casi toda la parcela";
-  if (pct >= 70 && pct <= 80) return "Tres cuartas partes (~75%)";
-  if (pct >= 45 && pct <= 55) return "La mitad (~50%)";
-  if (pct >= 30 && pct <= 36) return "Una tercera parte (~33%)";
-  if (pct >= 22 && pct <= 28) return "Una cuarta parte (~25%)";
-  if (pct >= 18 && pct <= 21) return "Una quinta parte (~20%)";
-  if (pct <= 12) return "Foco inicial (~10%)";
-  return `${pct}% de la superficie`;
-}
-
-function calcularAreaAfectadaPorDibujo() {
-  if (!rectanguloAfectado || !estadoApp.parcelaActual) return;
-  const bounds = rectanguloAfectado.getBounds();
-  const ne = bounds.getNorthEast();
-  const sw = bounds.getSouthWest();
-
-  const altoM = sw.distanceTo(L.latLng(ne.lat, sw.lng));
-  const anchoM = sw.distanceTo(L.latLng(sw.lat, ne.lng));
-  let haAfectadas = (altoM * anchoM) / 10000;
-  const supTotal = Number(estadoApp.parcelaActual.superficie_ha) || 1;
-  if (haAfectadas > supTotal) haAfectadas = supTotal;
-
-  const pct = Math.max(1, Math.min(100, Math.round((haAfectadas / supTotal) * 100)));
-  if (sliderPct) sliderPct.value = String(pct);
-  inputPct.value = String(pct);
-  actualizarSimuladorAgricultor();
-}
-
-function actualizarSimuladorAgricultor() {
+// R1: Clasificador Inteligente de Síntomas del Asistente
+function diagnosticarReporteConversacional(mensajeTexto, tieneFoto, tieneAudio, pctManual) {
   const p = estadoApp.parcelaActual;
-  const plagaId = selectPlaga?.value || "";
-  const plaga = mapaPlagas.get(plagaId) || null;
-  estadoApp.plagaActual = plaga;
+  const textoNorm = (mensajeTexto || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-  const pct = Number(sliderPct?.value || inputPct?.value || 10);
-  if (inputPct) inputPct.value = String(pct);
-  const supTotal = Number(p?.superficie_ha) || 0;
-  const ha = (supTotal * pct) / 100;
+  // Detectar si pregunta por seguimiento o visita previa
+  const pideSeguimiento = /(^|[^\wáéíóúñ])(cuando|a que hora|ya vienen|lo de ayer|seguimiento|vienen hoy|que paso con|mandaron al tecnico|estatus|visita)\b/i.test(textoNorm);
 
-  if (txtPorcentaje) txtPorcentaje.textContent = `${pct}%`;
-  if (txtHaAfectadas) txtHaAfectadas.textContent = `${ha.toFixed(2)} ha`;
-  if (txtFraccion) txtFraccion.textContent = describirFraccion(pct);
-
-  // Actualizar Ficha Guía de Síntomas de la Plaga
-  const fichaGuia = document.querySelector("#ficha-plaga-guia");
-  if (fichaGuia) {
-    if (!plaga) {
-      fichaGuia.classList.add("oculto");
-    } else {
-      fichaGuia.classList.remove("oculto");
-      document.querySelector("#ficha-plaga-nombre").textContent = plaga.nombre;
-      document.querySelector("#ficha-plaga-cientifico").textContent = plaga.nombre_cientifico || "";
-      document.querySelector("#ficha-plaga-esp").textContent =
-        plaga.especialidad === "entomologia" ? "🪲 Entomología" : "🍄 Fitopatología";
-      const ul = document.querySelector("#ficha-plaga-sintomas");
-      ul.innerHTML = (plaga.sintomas || []).map((s) => `<li>${s}</li>`).join("");
+  // Extraer porcentaje si viene en el texto ("la mitad", "20%", etc.)
+  let pct = pctManual || 10;
+  if (/toda la parcela|todo el predio|al 100/i.test(textoNorm)) pct = 100;
+  else if (/tres cuartas partes|75\s*%/i.test(textoNorm)) pct = 75;
+  else if (/dos terceras partes|66\s*%|67\s*%/i.test(textoNorm)) pct = 67;
+  else if (/la mitad|medio campo|50\s*%/i.test(textoNorm)) pct = 50;
+  else if (/una tercera parte|un tercio|33\s*%/i.test(textoNorm)) pct = 33;
+  else if (/una cuarta parte|un cuarto|25\s*%/i.test(textoNorm)) pct = 25;
+  else if (/una quinta parte|un quinto|20\s*%/i.test(textoNorm)) pct = 20;
+  else if (/una decima parte|un decimo|10\s*%/i.test(textoNorm)) pct = 10;
+  else {
+    const matchPct = textoNorm.match(/(\d{1,3})\s*%/);
+    if (matchPct) {
+      const num = parseInt(matchPct[1], 10);
+      if (num >= 1 && num <= 100) pct = num;
     }
   }
 
-  if (!p || !plaga) {
-    vistaSemaforo.className = "tarjeta-semaforo s-desconocido";
-    txtNombreSemaforo.textContent = "PENDIENTE DE SELECCIÓN";
-    txtPuntosPrioridad.textContent = "0";
-    txtTiempoVisita.textContent = "--";
-    document.querySelector("#pts-severidad").textContent = "0 / 50 pts";
-    document.querySelector("#pts-superficie").textContent = "0 / 25 pts";
-    document.querySelector("#pts-etapa").textContent = "0 / 25 pts";
-    document.querySelector("#bar-severidad").style.width = "0%";
-    document.querySelector("#bar-superficie").style.width = "0%";
-    document.querySelector("#bar-etapa").style.width = "0%";
-    document.querySelector("#sim-tec-nombre").textContent =
-      "Selecciona una plaga para calcular técnico cercano";
-    const bSim = document.querySelector("#badge-sim-brote");
-    if (bSim) {
-      bSim.className = "sim-brote-badge";
-      bSim.textContent = "Sin brote zonal";
+  // Reglas de diagnóstico empático para las 10 plagas oficiales
+  const reglasPlagas = [
+    {
+      id: "gusano_cogollero",
+      nombre: "Gusano cogollero",
+      cultivos: ["maiz", "maíz"],
+      regex: /cogoll|gusano|soldado|frugiperda|aserrin|hoja.*perforad|perforacion|mordid|comid.*hoja|cogollero|larva.*verde/i,
+      consejo: "Revisa el cogollo de plantas contiguas y evita aplicaciones químicas indiscriminadas que dañen a insectos benéficos.",
+      descripcion: "Se aprecian síntomas característicos de perforación y raspado en hojas jóvenes con probable presencia de larvas en el cogollo.",
+    },
+    {
+      id: "roya_frijol",
+      nombre: "Roya del frijol",
+      cultivos: ["frijol"],
+      regex: /roya|chahuixtle|polvillo|pustula|oxido|mancha.*cafe|amarill.*hoja/i,
+      consejo: "Evita el riego por aspersión tardío para reducir la humedad foliar que favorece la dispersión de esporas.",
+      descripcion: "Presencia de pústulas y polvillo rojizo-anaranjado característico del hongo de la roya.",
+    },
+    {
+      id: "pulgon",
+      nombre: "Pulgón",
+      cultivos: ["avena", "trigo", "maiz", "maíz", "haba"],
+      regex: /pulgon|pioj|mielec|fumagina|hoja.*enroll|negrilla|colonia/i,
+      consejo: "Monitorea presencia de catarinas o crisopas que son controladores biológicos naturales del pulgón.",
+      descripcion: "Colonias de pequeños insectos chupadores que segregan mielecilla y provocan enrollamiento de hojas.",
+    },
+    {
+      id: "gallina_ciega",
+      nombre: "Gallina ciega",
+      cultivos: ["maiz", "maíz", "frijol", "avena", "haba"],
+      regex: /gallina|ciega|nixticuil|gusano.*blanco|raiz.*comid|marchit|acamad|suelo/i,
+      consejo: "Realiza muestreo en suelo excavando 20 cm cerca de plantas marchitas para verificar densidad larvaria.",
+      descripcion: "Daño en el sistema radicular provocado por larvas subterráneas ('nixticuil'), provocando acame o marchitez.",
+    },
+    {
+      id: "tizon_tardio",
+      nombre: "Tizón tardío",
+      cultivos: ["papa", "jitomate"],
+      regex: /tizon|hielo|quemaz|mancha.*negra|tallo.*negro|pudric|olor.*podrid/i,
+      consejo: "Aísla las plantas más afectadas y no manipules el cultivo cuando esté mojado por el rocío.",
+      descripcion: "Quemazón severa con manchas acuosas y tallos ennegrecidos por patógeno fúngico.",
+    },
+    {
+      id: "mosquita_blanca",
+      nombre: "Mosquita blanca",
+      cultivos: ["jitomate", "frijol"],
+      regex: /mosquit.*blanca|mosquilla|palomill|mosca.*blanca|nube.*blanca|enchinad/i,
+      consejo: "Coloca trampas amarillas pegajosas en las orillas para monitorear la densidad de vuelo.",
+      descripcion: "Enjambres de diminutas moscas blancas transmisoras de virosis que succionan savia del envés.",
+    },
+    {
+      id: "chapulin",
+      nombre: "Chapulín",
+      cultivos: ["maiz", "maíz", "frijol", "haba", "avena"],
+      regex: /chapulin|saltamont|langosta|bordo|orilla|defoliad/i,
+      consejo: "Revisa orillas, bordos y caminos aledaños donde suelen concentrarse antes de avanzar al centro de la parcela.",
+      descripcion: "Defoliación rápida desde los bordes de la parcela provocada por saltamontes voraces.",
+    },
+    {
+      id: "mancha_chocolate",
+      nombre: "Mancha de chocolate",
+      cultivos: ["haba"],
+      regex: /chocolate|mancha.*chocolate|mancha.*redonda|caida.*flor|botrytis/i,
+      consejo: "Promueve la aireación entre surcos y evita encharcamientos.",
+      descripcion: "Manchas necróticas de color chocolate rojizo en follaje y tallos con riesgo de aborto floral.",
+    },
+    {
+      id: "hlb",
+      nombre: "HLB (Dragón Amarillo)",
+      cultivos: ["limon", "limón", "citricos", "cítricos"],
+      regex: /hlb|dragon|amarillo|enverdecim|motead|fruto.*deforme|asimetr/i,
+      consejo: "¡Alerta Cuarentenaria! No traslades varetas ni material vegetativo fuera del predio.",
+      descripcion: "Sintomatología coincidente con HLB/Dragón Amarillo, plaga bajo estricta vigilancia cuarentenaria oficial.",
+    },
+    {
+      id: "gorgojo_khapra",
+      nombre: "Gorgojo Khapra",
+      cultivos: ["almacen", "grano", "semilla", "maiz", "maíz"],
+      regex: /khapra|gorgojo|costal|almacen|grano.*hueco|peludo/i,
+      consejo: "¡Alerta Cuarentenaria! Mantén sellada la bodega y no distribuyas grano hasta la revisión oficial.",
+      descripcion: "Presencia de plaga de grano almacenado bajo alerta fitosanitaria prioritaria.",
+    },
+  ];
+
+  let plagaDetectada = null;
+  let reglaDetectada = null;
+  let sintomaEncontrado = false;
+
+  for (const r of reglasPlagas) {
+    if (r.regex.test(textoNorm)) {
+      reglaDetectada = r;
+      plagaDetectada = mapaPlagas.get(r.id);
+      sintomaEncontrado = true;
+      break;
     }
+  }
+
+  const esSeguimiento = pideSeguimiento && !sintomaEncontrado;
+
+  // Fallback según cultivo de la parcela si no se especificó síntoma directo
+  if (!plagaDetectada && p) {
+    const cultivoP = (p.cultivo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (cultivoP.includes("maiz")) {
+      plagaDetectada = mapaPlagas.get("gusano_cogollero");
+      reglaDetectada = reglasPlagas[0];
+    } else if (cultivoP.includes("frijol")) {
+      plagaDetectada = mapaPlagas.get("roya_frijol");
+      reglaDetectada = reglasPlagas[1];
+    } else if (cultivoP.includes("papa") || cultivoP.includes("jitomate")) {
+      plagaDetectada = mapaPlagas.get("tizon_tardio");
+      reglaDetectada = reglasPlagas[4];
+    } else if (cultivoP.includes("haba")) {
+      plagaDetectada = mapaPlagas.get("mancha_chocolate");
+      reglaDetectada = reglasPlagas[7];
+    } else if (cultivoP.includes("limon") || cultivoP.includes("citric")) {
+      plagaDetectada = mapaPlagas.get("hlb");
+      reglaDetectada = reglasPlagas[8];
+    } else {
+      plagaDetectada = estadoApp.plagas[0] || null;
+      reglaDetectada = reglasPlagas[0];
+    }
+  }
+
+  const calc = calcularPrioridadSemaforoDesglosado(plagaDetectada, p, pct);
+  const mejorTec = seleccionarTecnicoOptimo(plagaDetectada, p);
+  const vecinosBrote = plagaDetectada && p ? buscarVecinosBrote(plagaDetectada.id, p.lat, p.lon) : [];
+  const detonaBrote = vecinosBrote.length + 1 >= 3;
+
+  return {
+    esSeguimiento,
+    plaga: plagaDetectada,
+    regla: reglaDetectada,
+    pct,
+    calc,
+    tecnico: mejorTec?.tecnico || null,
+    distKm: mejorTec?.distKm || null,
+    brote: detonaBrote,
+    vecinosBroteCount: vecinosBrote.length + 1,
+  };
+}
+
+// R1: Mensajería del Chat Multimodal
+function iniciarChatParaParcela(parcela) {
+  const feed = document.querySelector("#chat-mensajes");
+  if (!feed) return;
+
+  const sesion = cargarSesion();
+  const nombreProd = sesion?.nombre || "productor";
+
+  // Si ya hay mensajes para esta parcela, renderizarlos
+  const msgs = chatHistorialParcelas.get(parcela.id) || [];
+  if (msgs.length > 0) {
+    feed.innerHTML = "";
+    msgs.forEach((m) => feed.appendChild(crearElementoMensaje(m)));
+    feed.scrollTop = feed.scrollHeight;
     return;
   }
 
-  const calc = calcularPrioridadSemaforoDesglosado(plaga, p, pct);
-  vistaSemaforo.className = `tarjeta-semaforo s-${calc.semaforo}`;
-  txtNombreSemaforo.textContent = calc.semaforo.toUpperCase();
-  txtPuntosPrioridad.textContent = String(calc.prioridad);
-  txtTiempoVisita.textContent = calc.tiempoVisita;
+  // Mensaje inicial de bienvenida empático del Asistente
+  feed.innerHTML = "";
+  const msgBienvenida = {
+    remitente: "bot",
+    texto: `¡Hola, ${escaparHtml(nombreProd)}! 👋 Soy tu Asistente Fitosanitario de Sanidad Vegetal. Estoy monitoreando tu cultivo de <strong>${escaparHtml(parcela.cultivo)}</strong> en la parcela <strong>${escaparHtml(parcela.id)}</strong>.<br/><br/>¿Qué daño o síntoma observas en tus plantas? Puedes escribirme con tus propias palabras, tomar una foto de la hoja o mandarme una nota de voz con el micrófono.`,
+    chips: [
+      "🐛 Hojas comidas con gusano en cogollo",
+      "🍂 Manchas de polvo anaranjado en hojas",
+      "🌱 Planta marchita y raíces comidas",
+      "🦗 Chapulines comiendo en la orilla",
+      "📅 ¿Cuándo viene el técnico a revisar?",
+    ],
+    tiempo: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  };
 
-  document.querySelector("#pts-severidad").textContent = `${calc.ptsSeveridad} / 50 pts`;
-  document.querySelector("#pts-superficie").textContent = `${calc.ptsSuperficie} / 25 pts`;
-  document.querySelector("#pts-etapa").textContent = `${calc.ptsEtapa} / 25 pts`;
+  msgs.push(msgBienvenida);
+  chatHistorialParcelas.set(parcela.id, msgs);
+  feed.appendChild(crearElementoMensaje(msgBienvenida));
+  feed.scrollTop = feed.scrollHeight;
+}
 
-  document.querySelector("#bar-severidad").style.width = `${(calc.ptsSeveridad / 50) * 100}%`;
-  document.querySelector("#bar-superficie").style.width = `${(calc.ptsSuperficie / 25) * 100}%`;
-  document.querySelector("#bar-etapa").style.width = `${(calc.ptsEtapa / 25) * 100}%`;
+function crearElementoMensaje(m) {
+  const div = document.createElement("div");
+  div.className = `chat-msg ${m.remitente === "usuario" ? "chat-msg-user" : "chat-msg-bot"}`;
 
-  // Técnico óptimo
-  const mejorTec = seleccionarTecnicoOptimo(plaga, p);
-  const elTecNombre = document.querySelector("#sim-tec-nombre");
-  if (elTecNombre) {
-    if (mejorTec) {
-      elTecNombre.textContent = `${mejorTec.tecnico.id} · ${mejorTec.tecnico.nombre} (Base ${mejorTec.tecnico.base}, a ${mejorTec.distKm.toFixed(2)} km · Carga ${mejorTec.carga}/5)`;
-    } else {
-      elTecNombre.textContent = "Todos los especialistas de esta área tienen carga llena (5/5)";
-    }
+  let htmlMedia = "";
+  if (m.fotoUrl) {
+    htmlMedia += `
+      <div class="chat-media-preview-bubble">
+        <img src="${m.fotoUrl}" alt="Evidencia de daño" />
+      </div>
+    `;
+  }
+  if (m.audioUrl) {
+    htmlMedia += `
+      <div style="margin-top:8px;">
+        <audio controls src="${m.audioUrl}" style="max-width:100%; height:34px;"></audio>
+      </div>
+    `;
   }
 
-  // Verificar si este reporte activaría o pertenecería a un brote (vecinos >= 2 previos + 1 actual = 3)
-  const vecinosMismaPlaga = buscarVecinosBrote(plaga.id, p.lat, p.lon);
-  const detonaBrote = vecinosMismaPlaga.length + 1 >= 3;
-  const bSim = document.querySelector("#badge-sim-brote");
-  if (bSim) {
-    if (detonaBrote) {
-      bSim.className = "sim-brote-badge activo";
-      bSim.textContent = `🔥 BROTE ACTIVO (${vecinosMismaPlaga.length + 1} casos ≤5 km)`;
+  let htmlChips = "";
+  if (Array.isArray(m.chips) && m.chips.length > 0) {
+    htmlChips = `
+      <div class="chat-quick-chips">
+        ${m.chips.map((c) => `<button type="button" class="quick-chip-btn">${escaparHtml(c)}</button>`).join("")}
+      </div>
+    `;
+  }
+
+  let htmlCard = "";
+  if (m.reporteCard) {
+    const rc = m.reporteCard;
+    htmlCard = `
+      <div class="chat-reporte-card">
+        <div class="chat-reporte-head">
+          <span>📋 Folio Asignado: ${escaparHtml(rc.folio)}</span>
+          <span class="tag-sem tag-${escaparHtml(rc.semaforo)}">${escaparHtml(rc.semaforo.toUpperCase())}</span>
+        </div>
+        <div class="chat-reporte-item">
+          <strong>Diagnóstico Asistido:</strong>
+          <span>${escaparHtml(rc.diagnostico)}</span>
+        </div>
+        <div class="chat-reporte-item">
+          <strong>Prioridad de Atención:</strong>
+          <span>${rc.prioridad}/100 pts · Área dañada marcada: <b>${rc.pct}%</b></span>
+        </div>
+        <div class="chat-reporte-item">
+          <strong>Visita Técnica Programada:</strong>
+          <span>👨‍🔬 <b>${escaparHtml(rc.tecnico)}</b> · Plazo estimado: <b>${escaparHtml(rc.tiempoVisita)}</b></span>
+        </div>
+        ${rc.brote ? `<div class="chat-reporte-item" style="color:#fdba74;"><strong>🔥 Alerta Epidemiológica:</strong> Brote activo zonal detectado a &le;5 km.</div>` : ""}
+        <div class="chat-reporte-item" style="font-size:11.5px; color:#a7f3d0; margin-top:2px;">
+          <strong>Recomendación Inmediata:</strong>
+          <span>${escaparHtml(rc.consejo)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  div.innerHTML = `
+    <div class="chat-msg-avatar">${m.remitente === "usuario" ? "👨‍🌾" : "🌱"}</div>
+    <div class="chat-bubble">
+      <div>${m.texto}</div>
+      ${htmlMedia}
+      ${htmlCard}
+      ${htmlChips}
+      <span class="chat-time">${escaparHtml(m.tiempo || "")}</span>
+    </div>
+  `;
+
+  // Listener para los chips de sugerencia rápida
+  div.querySelectorAll(".quick-chip-btn").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const txtInput = document.querySelector("#chat-input-texto");
+      if (txtInput) {
+        txtInput.value = chip.textContent.replace(/^[^\wáéíóúÁÉÍÓÚ¿?]+/, "").trim();
+        txtInput.focus();
+      }
+    });
+  });
+
+  return div;
+}
+
+async function procesarEnvioChat(textoMensaje) {
+  const p = estadoApp.parcelaActual;
+  if (!p) return;
+
+  const feed = document.querySelector("#chat-mensajes");
+  const ahora = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+  const tieneFoto = Boolean(fotoAdjuntaActual);
+  const tieneAudio = Boolean(audioAdjuntoActual);
+  const fotoUrl = fotoAdjuntaActual?.dataUrl || null;
+  const audioUrl = audioAdjuntoActual?.url || null;
+
+  // 1. Mensaje del usuario
+  const msgUser = {
+    remitente: "usuario",
+    texto: escaparHtml(textoMensaje || (tieneFoto ? "📸 Adjunto fotografía de evidencia" : tieneAudio ? "🎙️ Nota de voz de evidencia" : "Reporte fitosanitario")),
+    fotoUrl,
+    audioUrl,
+    tiempo: ahora,
+  };
+
+  const msgs = chatHistorialParcelas.get(p.id) || [];
+  msgs.push(msgUser);
+  chatHistorialParcelas.set(p.id, msgs);
+  feed.appendChild(crearElementoMensaje(msgUser));
+  feed.scrollTop = feed.scrollHeight;
+
+  // Limpiar adjuntos del estado actual
+  limpiarAdjuntosChat();
+
+  // Mostrar indicador de typing del asistente
+  const typingEl = document.querySelector("#chat-typing");
+  if (typingEl) typingEl.classList.remove("oculto");
+  feed.scrollTop = feed.scrollHeight;
+
+  // Pausa suave de análisis asistido (800ms)
+  setTimeout(async () => {
+    if (typingEl) typingEl.classList.add("oculto");
+
+    const diag = diagnosticarReporteConversacional(textoMensaje, tieneFoto, tieneAudio, pctDanioActual);
+    const folioNuevo = `R-${2065 + Math.floor(Math.random() * 30)}`;
+
+    let textoRespuesta = "";
+    let reporteCard = null;
+
+    if (diag.esSeguimiento) {
+      const casoActivo = estadoApp.casosHistorial.find((c) => c.parcela_id === p.id);
+      const tec = casoActivo ? mapaTecnicos.get(casoActivo.tecnico_id) : diag.tecnico;
+      textoRespuesta = `He consultado el estado de tu reporte en sistema. Tu parcela <strong>${escaparHtml(p.id)}</strong> tiene programada la inspección con el <strong>${tec ? `${tec.nombre} (${tec.especialidad})` : "técnico de campo"}</strong>. Si notas un incremento en la zona dañada o nuevos síntomas, mantén el área delimitada en el mapa satelital.`;
     } else {
-      bSim.className = "sim-brote-badge";
-      bSim.textContent = `Normal (${vecinosMismaPlaga.length + 1}/3 casos ≤5 km)`;
+      textoRespuesta = `✅ <strong>Hemos recibido y canalizado tu reporte con éxito.</strong> El motor de sanidad vegetal ha procesado tus síntomas y evidencia.`;
+      reporteCard = {
+        folio: folioNuevo,
+        semaforo: diag.calc.semaforo,
+        diagnostico: `${diag.plaga.nombre} (${diag.regla.descripcion})`,
+        prioridad: diag.calc.prioridad,
+        pct: diag.pct,
+        tecnico: diag.tecnico ? `${diag.tecnico.nombre} (${diag.tecnico.especialidad} · Base ${diag.tecnico.base})` : "Coordinación Fitosanitaria",
+        tiempoVisita: diag.calc.tiempoVisita,
+        brote: diag.brote,
+        consejo: diag.regla.consejo,
+      };
+
+      // Guardar en bitácora oficial
+      const nuevaEntrada = {
+        fecha: new Date().toLocaleDateString("en-CA"),
+        parcela: `${p.id} · ${p.nombre} (${p.municipio})`,
+        cultivo: p.cultivo,
+        actividad: `Reporte ${folioNuevo}: ${diag.plaga.nombre} (${diag.pct}% daño)`,
+        observaciones: `${textoMensaje ? `${textoMensaje} · ` : ""}Semáforo ${diag.calc.semaforo.toUpperCase()} (${diag.calc.prioridad} pts) · Técnico: ${diag.tecnico ? `${diag.tecnico.id} ${diag.tecnico.nombre}` : "En turno"}${tieneFoto ? " · [Con Foto]" : ""}${tieneAudio ? " · [Con Nota de Voz]" : ""}`,
+        pct: diag.pct,
+        semaforo: diag.calc.semaforo,
+        prioridad: diag.calc.prioridad,
+        tecnico_id: diag.tecnico?.id || null,
+      };
+      await guardarEntradaBitacora(nuevaEntrada);
+
+      // Agregar a casosHistorial en memoria
+      estadoApp.casosHistorial.unshift({
+        reporte_id: folioNuevo,
+        recibido: new Date().toISOString(),
+        parcela_id: p.id,
+        plaga: diag.plaga.id,
+        lat: p.lat,
+        lon: p.lon,
+        semaforo: diag.calc.semaforo,
+        prioridad: diag.calc.prioridad,
+        tecnico_id: diag.tecnico?.id || null,
+        brote: diag.brote,
+      });
+
+      renderizarKPIs();
+      actualizarVistaTecnico();
+      actualizarBannerVisitaParcela(p.id);
     }
+
+    const msgBot = {
+      remitente: "bot",
+      texto: textoRespuesta,
+      reporteCard,
+      tiempo: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    msgs.push(msgBot);
+    chatHistorialParcelas.set(p.id, msgs);
+    feed.appendChild(crearElementoMensaje(msgBot));
+    feed.scrollTop = feed.scrollHeight;
+
+    mostrarToast(`🚀 Reporte ${folioNuevo} emitido exitosamente`);
+  }, 850);
+}
+
+function limpiarAdjuntosChat() {
+  fotoAdjuntaActual = null;
+  audioAdjuntoActual = null;
+
+  const bar = document.querySelector("#chat-adjuntos-bar");
+  const pFoto = document.querySelector("#adjunto-foto-preview");
+  const pAudio = document.querySelector("#adjunto-audio-preview");
+  const fileInput = document.querySelector("#chat-file-input");
+
+  if (pFoto) pFoto.classList.add("oculto");
+  if (pAudio) pAudio.classList.add("oculto");
+  if (bar) bar.classList.add("oculto");
+  if (fileInput) fileInput.value = "";
+}
+
+function inicializarEventosPortalAgricultor() {
+  // Toque / Clic en el mapa satelital para ubicar el foco de daño
+  mapAgricultor.on("click", (e) => {
+    puntoDanioActual = [e.latlng.lat, e.latlng.lng];
+    actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
+    mostrarToast(`📍 Foco de afección marcado en la parcela (${pctDanioActual}%)`);
+  });
+
+  // 1. Selector de Daño: Chips rápidos
+  document.querySelectorAll(".btn-danio-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const pct = Number(btn.dataset.pct);
+      if (pct) {
+        pctDanioActual = pct;
+        actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
+      }
+    });
+  });
+
+  // Slider de daño fino
+  const slider = document.querySelector("#mapa-slider-pct");
+  slider?.addEventListener("input", (e) => {
+    pctDanioActual = Number(e.target.value) || 10;
+    actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
+  });
+
+  // Botón centrar / restablecer daño
+  document.querySelector("#btn-limpiar-danio")?.addEventListener("click", () => {
+    if (estadoApp.parcelaActual) {
+      puntoDanioActual = [Number(estadoApp.parcelaActual.lat), Number(estadoApp.parcelaActual.lon)];
+      pctDanioActual = 10;
+      actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
+      mostrarToast("↺ Foco de daño centrado en la parcela (10%)");
+    }
+  });
+
+  // 2. Adjuntar Fotografía
+  const fileInput = document.querySelector("#chat-file-input");
+  document.querySelector("#btn-adjuntar-foto")?.addEventListener("click", () => {
+    fileInput?.click();
+  });
+
+  fileInput?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      fotoAdjuntaActual = {
+        dataUrl: ev.target.result,
+        nombre: file.name,
+      };
+
+      const bar = document.querySelector("#chat-adjuntos-bar");
+      const pFoto = document.querySelector("#adjunto-foto-preview");
+      const img = document.querySelector("#adjunto-foto-img");
+      const lbl = document.querySelector("#adjunto-foto-name");
+
+      if (img) img.src = ev.target.result;
+      if (lbl) lbl.textContent = file.name;
+      if (pFoto) pFoto.classList.remove("oculto");
+      if (bar) bar.classList.remove("oculto");
+      mostrarToast("📸 Fotografía adjunta al reporte");
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.querySelector("#btn-remover-foto")?.addEventListener("click", () => {
+    fotoAdjuntaActual = null;
+    document.querySelector("#adjunto-foto-preview")?.classList.add("oculto");
+    if (!audioAdjuntoActual) {
+      document.querySelector("#chat-adjuntos-bar")?.classList.add("oculto");
+    }
+    if (fileInput) fileInput.value = "";
+  });
+
+  // 3. Grabación y simulación de nota de voz (Audio)
+  const btnGrabar = document.querySelector("#btn-grabar-audio");
+  const bannerGrabando = document.querySelector("#chat-grabando-banner");
+  const timerEl = document.querySelector("#chat-rec-timer");
+  const btnDetenerAudio = document.querySelector("#btn-detener-audio");
+  const btnCancelarAudio = document.querySelector("#btn-cancelar-audio");
+
+  const detenerGrabacion = () => {
+    if (grabacionTimer) clearInterval(grabacionTimer);
+    bannerGrabando?.classList.add("oculto");
+    grabacionActiva = false;
+
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      try {
+        mediaRecorder.stop();
+      } catch {}
+    } else {
+      // Simulación de audio si no hubo MediaRecorder activo
+      finalizarCapturaAudio(null, grabacionSegundos || 4);
+    }
+  };
+
+  const finalizarCapturaAudio = (blob, durSegundos) => {
+    const url = blob ? URL.createObjectURL(blob) : generarAudioTono();
+    const durTxt = `0:0${durSegundos || 4} s`;
+    audioAdjuntoActual = { url, duracion: durTxt };
+
+    const bar = document.querySelector("#chat-adjuntos-bar");
+    const pAudio = document.querySelector("#adjunto-audio-preview");
+    const audioPlayer = document.querySelector("#adjunto-audio-player");
+    const durLbl = document.querySelector("#adjunto-audio-dur");
+
+    if (audioPlayer) audioPlayer.src = url;
+    if (durLbl) durLbl.textContent = durTxt;
+    if (pAudio) pAudio.classList.remove("oculto");
+    if (bar) bar.classList.remove("oculto");
+    mostrarToast("🎙️ Nota de voz lista para enviar");
+  };
+
+  btnGrabar?.addEventListener("click", async () => {
+    if (grabacionActiva) {
+      detenerGrabacion();
+      return;
+    }
+
+    grabacionActiva = true;
+    grabacionSegundos = 0;
+    if (timerEl) timerEl.textContent = "0:00";
+    bannerGrabando?.classList.remove("oculto");
+
+    grabacionTimer = setInterval(() => {
+      grabacionSegundos++;
+      if (timerEl) timerEl.textContent = `0:${grabacionSegundos < 10 ? `0${grabacionSegundos}` : grabacionSegundos}`;
+    }, 1000);
+
+    // Intentar grabación con MediaRecorder del navegador
+    if (navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach((track) => track.stop());
+          const blob = new Blob(audioChunks, { type: "audio/ogg; codecs=opus" });
+          finalizarCapturaAudio(blob, grabacionSegundos || 1);
+        };
+        mediaRecorder.start();
+        return;
+      } catch {
+        // En caso de que no tenga micrófono disponible o permisos denegados, corre simulación
+      }
+    }
+  });
+
+  btnDetenerAudio?.addEventListener("click", detenerGrabacion);
+
+  btnCancelarAudio?.addEventListener("click", () => {
+    if (grabacionTimer) clearInterval(grabacionTimer);
+    bannerGrabando?.classList.add("oculto");
+    grabacionActiva = false;
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      try { mediaRecorder.stop(); } catch {}
+    }
+    mostrarToast("Grabación de audio cancelada");
+  });
+
+  document.querySelector("#btn-remover-audio")?.addEventListener("click", () => {
+    audioAdjuntoActual = null;
+    document.querySelector("#adjunto-audio-preview")?.classList.add("oculto");
+    if (!fotoAdjuntaActual) {
+      document.querySelector("#chat-adjuntos-bar")?.classList.add("oculto");
+    }
+  });
+
+  // 4. Envío del Formulario de Chat
+  const chatForm = document.querySelector("#chat-form");
+  const chatInput = document.querySelector("#chat-input-texto");
+
+  chatForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const texto = chatInput?.value?.trim() || "";
+    if (!texto && !fotoAdjuntaActual && !audioAdjuntoActual) {
+      mostrarToast("⚠️ Escribe un mensaje o adjunta una foto/nota de voz");
+      return;
+    }
+    if (chatInput) chatInput.value = "";
+    procesarEnvioChat(texto);
+  });
+
+  chatInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      chatForm?.dispatchEvent(new Event("submit", { cancelable: true }));
+    }
+  });
+}
+
+function generarAudioTono() {
+  try {
+    const sampleRate = 8000;
+    const duration = 2;
+    const numSamples = sampleRate * duration;
+    const buffer = new ArrayBuffer(44 + numSamples);
+    const view = new DataView(buffer);
+
+    const writeString = (offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + numSamples, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate, true);
+    view.setUint16(32, 1, true);
+    view.setUint16(34, 8, true);
+    writeString(36, "data");
+    view.setUint32(40, numSamples, true);
+
+    for (let i = 0; i < numSamples; i++) {
+      const t = i / sampleRate;
+      const sample = Math.sin(2 * Math.PI * 440 * t) * Math.exp(-t * 1.5);
+      view.setUint8(44 + i, Math.floor((sample + 1) * 127.5));
+    }
+
+    const blob = new Blob([buffer], { type: "audio/wav" });
+    return URL.createObjectURL(blob);
+  } catch {
+    return "";
   }
 }
+
 
 // ============================================================================
 // BITÁCORA (SUPABASE + SERVIDOR + TABLAS EN VIVO)
@@ -1857,89 +2369,8 @@ document.querySelector("#btn-centrar-mapa-tec")?.addEventListener("click", () =>
   mapTecnico.flyTo([19.515, -98.875], 11, { duration: 0.7 });
 });
 
-// Eventos en Vista Agricultor
-selectProductorActivo?.addEventListener("change", (e) => {
-  estadoApp.productorActualId = e.target.value;
-  poblarSelectoresCatalogo();
-  const prod = mapaProductores.get(estadoApp.productorActualId);
-  const primeraParcelaId = prod?.parcelas?.[0] || estadoApp.parcelas[0]?.id;
-  if (primeraParcelaId) seleccionarParcelaAgricultor(primeraParcelaId);
-});
-
-selectParcela?.addEventListener("change", (e) => {
-  seleccionarParcelaAgricultor(e.target.value);
-});
-
-selectPlaga?.addEventListener("change", () => {
-  actualizarSimuladorAgricultor();
-});
-
-sliderPct?.addEventListener("input", () => {
-  actualizarSimuladorAgricultor();
-});
-
-inputFecha?.addEventListener("change", () => {
-  if (estadoApp.parcelaActual) {
-    seleccionarParcelaAgricultor(estadoApp.parcelaActual.id);
-  } else {
-    actualizarSimuladorAgricultor();
-  }
-});
-
-// Envío del Formulario de Reporte del Agricultor
-document.querySelector("#registro")?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const p = estadoApp.parcelaActual;
-  const pl = estadoApp.plagaActual;
-  if (!p || !pl) return;
-
-  const pct = Number(sliderPct?.value || 10);
-  const calc = calcularPrioridadSemaforoDesglosado(pl, p, pct);
-  const mejorTec = seleccionarTecnicoOptimo(pl, p);
-  const obs = document.querySelector("#observaciones")?.value || "";
-  const folioNuevo = `R-${2065 + Math.floor(Math.random() * 30)}`;
-
-  const nuevaEntrada = {
-    fecha: inputFecha?.value || new Date().toLocaleDateString("en-CA"),
-    parcela: `${p.id} · ${p.nombre} (${p.municipio})`,
-    cultivo: p.cultivo,
-    actividad: `Alerta ${folioNuevo}: ${pl.nombre} (${pct}% daño)`,
-    observaciones: `${obs ? `${obs} · ` : ""}Semáforo ${calc.semaforo.toUpperCase()} (${calc.prioridad} pts) · Técnico: ${mejorTec ? `${mejorTec.tecnico.id} ${mejorTec.tecnico.nombre}` : "En turno"}`,
-    pct,
-    semaforo: calc.semaforo,
-    prioridad: calc.prioridad,
-    tecnico_id: mejorTec?.tecnico.id || null,
-  };
-
-  await guardarEntradaBitacora(nuevaEntrada);
-
-  // También agregarlo en memoria a los casos activos para que se vea reflejado al instante
-  const vecinos = buscarVecinosBrote(pl.id, p.lat, p.lon);
-  estadoApp.casosHistorial.unshift({
-    reporte_id: folioNuevo,
-    recibido: new Date().toISOString(),
-    parcela_id: p.id,
-    plaga: pl.id,
-    lat: p.lat,
-    lon: p.lon,
-    semaforo: calc.semaforo,
-    prioridad: calc.prioridad,
-    tecnico_id: mejorTec?.tecnico.id || null,
-    brote: vecinos.length + 1 >= 3,
-  });
-
-  renderizarKPIs();
-  actualizarVistaTecnico();
-  seleccionarParcelaAgricultor(p.id);
-
-  const estadoTxt = document.querySelector("#estado");
-  if (estadoTxt) {
-    estadoTxt.textContent = `✅ Folio ${folioNuevo} emitido: Semáforo ${calc.semaforo.toUpperCase()} (${calc.prioridad} pts) · Asignado a ${mejorTec ? mejorTec.tecnico.nombre : "Coordinación"}.`;
-  }
-  mostrarToast(`🚀 Alerta ${folioNuevo} registrada (${calc.semaforo.toUpperCase()} · ${calc.prioridad} pts)`);
-  const obsEl = document.querySelector("#observaciones");
-  if (obsEl) obsEl.value = "";
-});
+// Eventos del Portal del Agricultor (Chat Multimodal & Marcado Satelital de Daño)
+inicializarEventosPortalAgricultor();
 
 // Formulario directo de Bitácora General (Vista 3)
 document.querySelector("#bit-parcela")?.addEventListener("change", (e) => {
@@ -2045,10 +2476,8 @@ document.querySelector("#indicador-en-vivo")?.addEventListener("click", () => {
 
 // ============================================================================
 // INICIALIZACIÓN
-// ============================================================================
 function iniciarPanel() {
   const hoy = new Date().toLocaleDateString("en-CA");
-  if (inputFecha) inputFecha.value = hoy;
   const bitFecha = document.querySelector("#bit-fecha");
   if (bitFecha) bitFecha.value = hoy;
 
@@ -2059,12 +2488,8 @@ function iniciarPanel() {
   poblarModalAuthAgricultor();
   inicializarEventosAuth();
 
-  // Seleccionar una parcela inicial con caso interesante o la primera del productor
+  // Seleccionar una parcela inicial por defecto
   seleccionarParcelaAgricultor("P-001");
-  if (selectPlaga && estadoApp.plagas.length > 0) {
-    selectPlaga.value = "gusano_cogollero";
-    actualizarSimuladorAgricultor();
-  }
 
   const bitCultivo = document.querySelector("#bit-cultivo");
   if (bitCultivo) bitCultivo.value = "maíz";

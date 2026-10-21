@@ -22,14 +22,42 @@
   <header class="topbar">
     <div class="topbar-inner">
       <div class="brand-area" id="brand-home" title="Volver a la página principal">
-        <div class="brand-badges">
-          <span class="badge-equipo">
-            <span class="pulse-dot"></span>
-            Equipo 07 · MISA · DIMA Chapingo
-          </span>
-          <span class="badge-nivel">Hackathon Nivel 2 · En Vivo</span>
+        <div class="brand-logo-container">
+          <svg class="logo-fitosanitario" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Logotipo Oficial Sanidad Vegetal">
+            <defs>
+              <linearGradient id="logo-shield-grad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#10b981" />
+                <stop offset="50%" stop-color="#059669" />
+                <stop offset="100%" stop-color="#0f766e" />
+              </linearGradient>
+              <linearGradient id="logo-radar-grad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#38bdf8" />
+                <stop offset="100%" stop-color="#0284c7" />
+              </linearGradient>
+              <linearGradient id="logo-leaf-grad" x1="12" y1="36" x2="32" y2="10" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#22c55e" />
+                <stop offset="60%" stop-color="#4ade80" />
+                <stop offset="100%" stop-color="#a3e635" />
+              </linearGradient>
+            </defs>
+            <path d="M22 3L6 9V20C6 29.5 12.8 38.3 22 41C31.2 38.3 38 29.5 38 20V9L22 3Z" fill="#0b1726" stroke="url(#logo-shield-grad)" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M12 20C12 14.48 16.48 10 22 10" stroke="url(#logo-radar-grad)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
+            <path d="M8 20C8 12.27 14.27 6 22 6" stroke="url(#logo-radar-grad)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 4" opacity="0.6"/>
+            <path d="M22 34V15M22 15C18 19 15 25 18 29C20 31.6 22 34 22 34C22 34 24 31.6 26 29C29 25 26 19 22 15Z" fill="url(#logo-leaf-grad)" stroke="#15803d" stroke-width="1.2" stroke-linejoin="round"/>
+            <path d="M22 21L18.5 24M22 25L19 28M22 21L25.5 24M22 25L25 28" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.75"/>
+            <circle cx="22" cy="14" r="2.5" fill="#f59e0b"/>
+          </svg>
         </div>
-        <h1 class="brand-title">Alerta Plaga <span class="brand-subtitle">Vigilancia Fitosanitaria & Control Geoespacial</span></h1>
+        <div class="brand-text-block">
+          <div class="brand-badges">
+            <span class="badge-equipo">
+              <span class="pulse-dot"></span>
+              Equipo 07 · MISA · DIMA Chapingo
+            </span>
+            <span class="badge-nivel">Hackathon Nivel 2 · En Vivo</span>
+          </div>
+          <h1 class="brand-title">Alerta Plaga <span class="brand-subtitle">Vigilancia Fitosanitaria & Control Geoespacial</span></h1>
+        </div>
       </div>
 
       <!-- Navegación interna exclusiva para Coordinador Técnico (solo visible al autenticar rol de coordinación) -->
@@ -430,231 +458,188 @@
   </main>
 
   <!-- ========================================================================
-       VISTA 2: PORTAL DEL AGRICULTOR (PRODUCTORES)
+       VISTA 2: PORTAL DEL AGRICULTOR (ASISTENTE CONVERSACIONAL & MAPA DE PARCELA)
        ======================================================================== -->
   <section id="vista-agricultor" class="vista-contenedor oculto">
-    <!-- Banner de Bienvenida del Productor -->
+    <!-- Banner de Identidad del Portal y Productor Autenticado -->
     <div class="section-banner banner-agricultor">
       <div class="banner-left">
-        <span class="banner-tag">PORTAL DE ATENCIÓN AL PRODUCTOR · VALLE DE TEXCOCO Y REGIÓN ORIENTE</span>
-        <h2>Mi Parcela, Radar de Vecindad Fitosanitaria y Emisión de Reportes</h2>
-        <p>Consulta el estado sanitario de tus parcelas, revisa alertas de brotes cercanos a menos de 5 km y delimita áreas dañadas en el mapa satelital para recibir atención técnica prioritaria.</p>
-      </div>
-      <div class="selector-productor-box">
-        <label for="select-productor-activo">👨‍🌾 Productor en sesión:</label>
-        <select id="select-productor-activo">
-          <option value="PR-101">PR-101 · Fidel Jiménez (Texcoco)</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Tarjetas de Resumen del Productor Seleccionado -->
-    <div class="agricultor-status-grid">
-      <div class="tarjeta card-mi-parcela-info">
-        <div class="card-mini-head">
-          <span class="mini-badge">🌱 Parcela Seleccionada</span>
-          <span id="agr-parcela-municipio" class="mini-loc">Texcoco, Edo. Méx.</span>
-        </div>
-        <h3 id="agr-parcela-titulo">P-001 · Tlacotepec</h3>
-        <div class="agr-specs-row">
-          <div class="spec-pill"><span>Cultivo:</span> <strong id="agr-spec-cultivo">Maíz</strong></div>
-          <div class="spec-pill"><span>Etapa:</span> <strong id="agr-spec-etapa">V10</strong></div>
-          <div class="spec-pill"><span>Superficie:</span> <strong id="agr-spec-sup">5.5 ha</strong></div>
-        </div>
-        <div id="agr-estado-caso-actual" class="agr-alerta-box estado-limpio">
-          <!-- Se actualiza según si la parcela tiene caso activo -->
-        </div>
-      </div>
-
-      <div class="tarjeta card-radar-vecindad">
-        <div class="card-mini-head">
-          <span class="mini-badge badge-radar">📡 Radar Fitosanitario (&le; 5 km)</span>
-          <span id="agr-radar-count" class="mini-loc">0 alertas cercanas</span>
-        </div>
-        <h3>Vigilancia de Parcelas Vecinas (Últimos 7 días)</h3>
-        <div id="agr-lista-vecinos" class="vecinos-list">
-          <!-- Casos cercanos a <= 5 km -->
+        <div class="banner-brand-row">
+          <div class="banner-logo-wrap">
+            <svg class="logo-fitosanitario logo-agri-banner" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Logotipo Oficial Sanidad Vegetal">
+              <defs>
+                <linearGradient id="logo-shield-grad-2" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#10b981" />
+                  <stop offset="50%" stop-color="#059669" />
+                  <stop offset="100%" stop-color="#0f766e" />
+                </linearGradient>
+                <linearGradient id="logo-radar-grad-2" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#38bdf8" />
+                  <stop offset="100%" stop-color="#0284c7" />
+                </linearGradient>
+                <linearGradient id="logo-leaf-grad-2" x1="12" y1="36" x2="32" y2="10" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#22c55e" />
+                  <stop offset="60%" stop-color="#4ade80" />
+                  <stop offset="100%" stop-color="#a3e635" />
+                </linearGradient>
+              </defs>
+              <path d="M22 3L6 9V20C6 29.5 12.8 38.3 22 41C31.2 38.3 38 29.5 38 20V9L22 3Z" fill="#0b1726" stroke="url(#logo-shield-grad-2)" stroke-width="2" stroke-linejoin="round"/>
+              <path d="M12 20C12 14.48 16.48 10 22 10" stroke="url(#logo-radar-grad-2)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
+              <path d="M8 20C8 12.27 14.27 6 22 6" stroke="url(#logo-radar-grad-2)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 4" opacity="0.6"/>
+              <path d="M22 34V15M22 15C18 19 15 25 18 29C20 31.6 22 34 22 34C22 34 24 31.6 26 29C29 25 26 19 22 15Z" fill="url(#logo-leaf-grad-2)" stroke="#15803d" stroke-width="1.2" stroke-linejoin="round"/>
+              <path d="M22 21L18.5 24M22 25L19 28M22 21L25.5 24M22 25L25 28" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.75"/>
+              <circle cx="22" cy="14" r="2.5" fill="#f59e0b"/>
+            </svg>
+          </div>
+          <div class="banner-headings">
+            <span class="banner-tag">SISTEMA FITOSANITARIO · ATENCIÓN DE CAMPO · DIMA CHAPINGO</span>
+            <h2>Portal del Agricultor</h2>
+            <p class="banner-desc">Canal directo para reportar anomalías en tus cultivos por texto libre, fotos y notas de voz con diagnóstico asistido por IA y respuesta técnica inmediata.</p>
+          </div>
         </div>
       </div>
-
-      <div class="tarjeta card-mis-avisos">
-        <div class="card-mini-head">
-          <span class="mini-badge badge-buzon">📬 Mis Avisos Oficiales</span>
-          <span id="agr-avisos-count" class="mini-loc">Buzón de la Junta</span>
-        </div>
-        <h3>Notificaciones de Folio, Visita y Brotes</h3>
-        <div id="agr-lista-avisos" class="vecinos-list">
-          <!-- Avisos dirigidos a este productor o parcela -->
+      <!-- Tarjeta fija de sesión de productor (sin selectores para cambiar) -->
+      <div class="productor-sesion-card" id="productor-sesion-card">
+        <div class="prod-avatar">👨‍🌾</div>
+        <div class="prod-info">
+          <span class="prod-badge-verified">✓ Productor en Sesión Activa</span>
+          <strong id="agr-productor-nombre">Fidel Jiménez</strong>
+          <span class="prod-sub" id="agr-productor-id">Clave: PR-101 · Texcoco, Edo. Méx.</span>
         </div>
       </div>
     </div>
 
-    <!-- Cuerpo Principal del Agricultor: Formulario + Mapa de Delimitación -->
+    <!-- Barra de Selección de Parcelas Propias (Aislamiento Total del Productor) -->
+    <div class="agr-parcelas-bar" id="agr-parcelas-bar">
+      <div class="agr-parcelas-label">
+        <span>🌱 Mis Parcelas Registradas:</span>
+      </div>
+      <div id="agr-parcelas-tabs" class="agr-parcelas-tabs">
+        <!-- Pestañas generadas dinámicamente con solo las parcelas de este productor -->
+      </div>
+    </div>
+
+    <!-- Tarjeta de Estado de Visita Técnica y Alertas Críticas (Minimalista, sin tablas ajenas) -->
+    <div id="agr-visita-status" class="agr-visita-status-box">
+      <!-- Se actualiza dinámicamente según la parcela seleccionada -->
+    </div>
+
+    <!-- Cuadrícula Principal: Chat Multimodal + Mapa Satelital Centrado -->
     <div class="agricultor-main-grid">
-      <!-- Columna Izquierda: Formulario de Reporte y Simulador de Reglas -->
-      <div class="tarjeta panel-formulario">
-        <div class="form-title-row">
-          <h2>📝 Reportar Afección en Mi Parcela</h2>
-          <span class="tag-ia">Motor Determinista Nivel 2</span>
+      <!-- Columna 1: Chat de Asistencia Multimodal -->
+      <div class="tarjeta panel-chat-box">
+        <div class="chat-header">
+          <div class="chat-header-info">
+            <div class="chat-avatar">🌱</div>
+            <div>
+              <div class="chat-title-row">
+                <h3>Asistente Fitosanitario</h3>
+                <span class="chat-online-badge">● En línea</span>
+              </div>
+              <p class="chat-subtitle">Sanidad Vegetal · Chapingo · Asistencia de Campo 24/7</p>
+            </div>
+          </div>
+          <div class="chat-parcela-tag">
+            <span id="chat-parcela-badge">🌱 Parcela P-001 (Maíz)</span>
+          </div>
         </div>
 
-        <form id="registro">
-          <div class="dos">
-            <div class="campo">
-              <label for="fecha">Fecha del Reporte</label>
-              <input id="fecha" type="date" name="fecha" required>
+        <!-- Feed de Mensajes -->
+        <div id="chat-mensajes" class="chat-mensajes-feed">
+          <!-- Mensaje inicial de bienvenida y chips rápidos generados por JS -->
+        </div>
+
+        <!-- Indicador de que el Asistente está analizando -->
+        <div id="chat-typing" class="chat-typing-row oculto">
+          <div class="typing-bubble">
+            <span>El asistente está evaluando los síntomas</span>
+            <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+          </div>
+        </div>
+
+        <!-- Barra de Previsualización de Adjuntos (Foto o Audio) -->
+        <div id="chat-adjuntos-bar" class="chat-adjuntos-bar oculto">
+          <div id="adjunto-foto-preview" class="adjunto-chip oculto">
+            <img id="adjunto-foto-img" src="" alt="Foto adjunta" class="adjunto-thumb" />
+            <div class="adjunto-chip-info">
+              <span class="adjunto-chip-title">📸 Fotografía lista</span>
+              <span id="adjunto-foto-name" class="adjunto-chip-sub">evidencia.jpg</span>
             </div>
-            <div class="campo">
-              <label for="parcela">Parcela Asignada (264 en catálogo)</label>
-              <select id="parcela" name="parcela" required>
-                <option value="">Cargando parcelas...</option>
-              </select>
-            </div>
+            <button type="button" id="btn-remover-foto" class="btn-adjunto-del" title="Quitar foto">✕</button>
           </div>
 
-          <div class="dos">
-            <div class="campo">
-              <label for="cultivo">Cultivo Registrado</label>
-              <input id="cultivo" type="text" name="cultivo" readonly placeholder="Se autocompleta">
+          <div id="adjunto-audio-preview" class="adjunto-chip oculto">
+            <span class="adjunto-chip-icon">🎙️</span>
+            <div class="adjunto-chip-info">
+              <span class="adjunto-chip-title">Nota de voz grabada</span>
+              <span id="adjunto-audio-dur" class="adjunto-chip-sub">0:05 s</span>
             </div>
-            <div class="campo">
-              <label for="etapa">Etapa Fenológica</label>
-              <input id="etapa" type="text" name="etapa" readonly placeholder="Ej. V8">
-            </div>
+            <audio id="adjunto-audio-player" controls class="adjunto-audio-mini"></audio>
+            <button type="button" id="btn-remover-audio" class="btn-adjunto-del" title="Quitar audio">✕</button>
           </div>
+        </div>
 
-          <div class="campo">
-            <label for="plaga">Identificación de Plaga o Síntoma (10 Plagas Oficiales)</label>
-            <select id="plaga" name="plaga" required>
-              <option value="">Selecciona o detecta plaga...</option>
-            </select>
+        <!-- Banner de Grabación Activa de Audio -->
+        <div id="chat-grabando-banner" class="chat-grabando-banner oculto">
+          <div class="grabando-indicador">
+            <span class="rec-pulse-dot"></span>
+            <span>Grabando nota de voz...</span>
+            <strong id="chat-rec-timer">0:00</strong>
           </div>
-
-          <!-- Guía Rápida de Síntomas de la Plaga Seleccionada -->
-          <div id="ficha-plaga-guia" class="ficha-plaga oculto">
-            <div class="ficha-plaga-top">
-              <div>
-                <strong id="ficha-plaga-nombre">Gusano cogollero</strong>
-                <em id="ficha-plaga-cientifico">Spodoptera frugiperda</em>
-              </div>
-              <span id="ficha-plaga-esp" class="badge-esp">Entomología</span>
-            </div>
-            <p class="ficha-sintomas-tit">Síntomas característicos en campo:</p>
-            <ul id="ficha-plaga-sintomas" class="ficha-sintomas-list"></ul>
+          <div class="grabando-actions">
+            <button type="button" id="btn-detener-audio" class="btn-rec-stop">⏹️ Listo</button>
+            <button type="button" id="btn-cancelar-audio" class="btn-rec-cancel">✕ Cancelar</button>
           </div>
+        </div>
 
-          <!-- Delimitación de Superficie Afectada (Mapa o Deslizador) -->
-          <div class="campo">
-            <div class="label-row">
-              <label for="slider-pct">Delimitación del Área Afectada (Dibuja en el mapa o ajusta el deslizador)</label>
-              <span class="pct-pill" id="porcentaje-afectado">10%</span>
-            </div>
-            <input type="range" id="slider-pct" min="1" max="100" value="10" class="range-pct">
-            <input type="hidden" id="pct_hidden" name="porcentaje" value="10">
-
-            <div class="metricas-geometria">
-              <div>Superficie Total: <strong id="superficie-total">0.0 ha</strong></div>
-              <div>Área Dañada: <strong id="ha-afectadas">0.00 ha</strong></div>
-              <div>Fracción aprox.: <strong id="fraccion-aprox">Décima parte</strong></div>
-            </div>
-          </div>
-
-          <!-- Tarjeta de Semáforo, Desglose de Puntos, Técnico Sugerido y Brote -->
-          <div id="vista-previa-semaforo" class="tarjeta-semaforo s-desconocido">
-            <div class="semaforo-top-row">
-              <div class="semaforo-main-badge">
-                <div class="indicador-circulo"></div>
-                <div>
-                  <div class="tit-sem">Semáforo: <span id="nombre-semaforo">PENDIENTE</span></div>
-                  <div class="sub-sem">Prioridad: <strong id="puntos-prioridad">0</strong>/100 pts · Atención en: <strong id="tiempo-visita">--</strong></div>
-                </div>
-              </div>
-              <div id="badge-sim-brote" class="sim-brote-badge">
-                Sin brote zonal
-              </div>
-            </div>
-
-            <!-- Barras de Desglose de la Fórmula Oficial (Sección 7) -->
-            <div class="desglose-factores">
-              <div class="factor-row">
-                <div class="factor-labels">
-                  <span>1. Factor Severidad de Plaga</span>
-                  <strong id="pts-severidad">0 / 50 pts</strong>
-                </div>
-                <div class="factor-bar-bg"><div id="bar-severidad" class="factor-bar-fill" style="width: 0%"></div></div>
-              </div>
-              <div class="factor-row">
-                <div class="factor-labels">
-                  <span>2. Factor Superficie Dañada</span>
-                  <strong id="pts-superficie">0 / 25 pts</strong>
-                </div>
-                <div class="factor-bar-bg"><div id="bar-superficie" class="factor-bar-fill" style="width: 0%"></div></div>
-              </div>
-              <div class="factor-row">
-                <div class="factor-labels">
-                  <span>3. Factor Etapa Fenológica</span>
-                  <strong id="pts-etapa">0 / 25 pts</strong>
-                </div>
-                <div class="factor-bar-bg"><div id="bar-etapa" class="factor-bar-fill" style="width: 0%"></div></div>
-              </div>
-            </div>
-
-            <!-- Técnico Asignado por Algoritmo Haversine -->
-            <div class="sim-tecnico-row" id="sim-tecnico-box">
-              <span class="sim-tec-icon">👨‍🔬</span>
-              <div class="sim-tec-info">
-                <span class="sim-tec-label">Técnico óptimo asignado (Regla Sección 8):</span>
-                <strong id="sim-tec-nombre">Selecciona una plaga para calcular asignación</strong>
-              </div>
-            </div>
-          </div>
-
-          <div class="campo">
-            <label for="observaciones">Observaciones o Síntomas en Campo</label>
-            <textarea id="observaciones" name="observaciones" rows="2" placeholder="Ej. Hojas perforadas en forma de ventana, presencia de aserrín en el cogollo..."></textarea>
-          </div>
-
-          <button type="submit" id="btn-enviar" class="btn-submit-glow">
-            🚀 Emitir Alerta Fitosanitaria & Guardar en Bitácora
+        <!-- Barra de Entrada Multimodal (Texto, Cámara, Micrófono) -->
+        <form id="chat-form" class="chat-input-bar">
+          <input type="file" id="chat-file-input" accept="image/*" class="oculto" capture="environment">
+          <button type="button" id="btn-adjuntar-foto" class="btn-chat-attach" title="Adjuntar foto de la hoja o plaga">
+            <span>📷</span>
           </button>
-          <p id="estado" class="estado" role="status"></p>
+          <button type="button" id="btn-grabar-audio" class="btn-chat-attach" title="Grabar nota de voz">
+            <span>🎙️</span>
+          </button>
+          <div class="chat-input-wrap">
+            <textarea id="chat-input-texto" rows="1" placeholder="Describe lo que notas (ej. hojas comidas, gusanos en cogollo)..."></textarea>
+          </div>
+          <button type="submit" id="btn-chat-enviar" class="btn-chat-send" title="Enviar reporte">
+            <span>➤</span>
+          </button>
         </form>
       </div>
 
-      <!-- Columna Derecha: Mapa Satelital de la Parcela + Historial de la Parcela -->
-      <div class="panel-derecho">
-        <div class="tarjeta tarjeta-mapa">
-          <div class="mapa-header">
-            <div>
-              <h3>🛰️ Mapa Satelital de Mi Parcela & Vecindad (5 km)</h3>
-              <p class="sub-hint">Dibuja un rectángulo con la herramienta superior izquierda del mapa para medir el área afectada automáticamente.</p>
-            </div>
-            <span class="ayuda-mapa">🖱️ Herramienta de dibujo activa</span>
+      <!-- Columna 2: Mapa Satelital Fitosanitario Centrado en la Parcela -->
+      <div class="tarjeta panel-mapa-box">
+        <div class="mapa-header-agri">
+          <div class="mapa-header-tit">
+            <h3>🛰️ Mapa Satelital de Mi Parcela</h3>
+            <p id="mapa-sub-hint" class="sub-hint">Toca o haz clic en la parcela para marcar el foco del daño.</p>
           </div>
-          <div id="mapa" class="mapa-lienzo"></div>
+          <div class="mapa-metrics-pill" id="mapa-metrics-pill">
+            <span class="dot-danio"></span>
+            <span id="mapa-metrics-txt">Área afectada: <strong>10%</strong> (~0.55 ha)</span>
+          </div>
         </div>
 
-        <div class="tarjeta tabla">
-          <div class="card-header-row">
-            <h3>📋 Historial Reciente de Alertas Emitidas</h3>
-            <span class="badge-mini-count" id="badge-count-registros">En vivo</span>
+        <!-- Contenedor del Mapa Leaflet -->
+        <div id="mapa" class="mapa-satelital-lienzo"></div>
+
+        <!-- Barra de Controles Táctiles de Marcado de Daño -->
+        <div class="mapa-danio-toolbar">
+          <div class="danio-quick-pills">
+            <span class="danio-lbl">Dimensión del daño:</span>
+            <button type="button" class="btn-danio-chip active" data-pct="10">Foco leve (10%)</button>
+            <button type="button" class="btn-danio-chip" data-pct="25">Cuarta parte (25%)</button>
+            <button type="button" class="btn-danio-chip" data-pct="50">Mitad (50%)</button>
+            <button type="button" class="btn-danio-chip" data-pct="100">Toda la parcela (100%)</button>
+            <button type="button" id="btn-limpiar-danio" class="btn-danio-clear" title="Restablecer marcado">↺ Centrar</button>
           </div>
-          <div class="tabla-responsive">
-            <table id="registros">
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Parcela</th>
-                  <th>Cultivo</th>
-                  <th>Plaga / Actividad</th>
-                  <th>% Daño</th>
-                  <th>Semáforo & Técnico</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td colspan="6">Cargando registros...</td></tr>
-              </tbody>
-            </table>
+          <div class="danio-slider-row">
+            <span class="slider-lbl">Ajuste fino (%):</span>
+            <input type="range" id="mapa-slider-pct" min="1" max="100" value="10" class="range-pct-agri">
+            <span id="mapa-slider-val" class="slider-val-badge">10%</span>
           </div>
         </div>
       </div>

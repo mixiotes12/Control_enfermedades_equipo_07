@@ -929,434 +929,959 @@ tbody tr:hover {
 }
 
 /* ============================================================================
-   VISTA AGRICULTOR (PRODUCTORES)
+   VISTA AGRICULTOR (PORTAL CONVERSACIONAL Y MAPA DE PARCELA)
    ============================================================================ */
-.selector-productor-box {
+.banner-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.banner-logo-wrap {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-agri-banner {
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 3px 12px rgba(16, 185, 129, 0.45));
+}
+
+.banner-headings {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  min-width: 310px;
 }
 
-.selector-productor-box label {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: #6ee7b7;
-}
-
-.agricultor-status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  margin-bottom: 20px;
-}
-
-.card-mini-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.mini-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(16, 185, 129, 0.16);
-  color: #6ee7b7;
-}
-
-.badge-radar {
-  background: rgba(249, 115, 22, 0.18);
-  color: #fdba74;
-}
-
-.badge-buzon {
-  background: rgba(56, 189, 248, 0.18);
-  color: #7dd3fc;
-}
-
-.mini-loc {
-  font-size: 11.5px;
-  color: var(--tenue);
-}
-
-.agr-specs-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin: 10px 0 12px;
-}
-
-.spec-pill {
-  background: rgba(11, 19, 34, 0.8);
-  border: 1px solid var(--linea);
-  padding: 5px 10px;
-  border-radius: 8px;
-  font-size: 12px;
+.banner-desc {
+  margin: 6px 0 0;
+  font-size: 13.5px;
   color: var(--texto-sec);
-}
-
-.spec-pill strong {
-  color: #ffffff;
-  text-transform: capitalize;
-}
-
-.agr-alerta-box {
-  padding: 11px 13px;
-  border-radius: 10px;
-  font-size: 12.5px;
   line-height: 1.45;
-  border: 1px solid var(--linea);
+  max-width: 650px;
 }
 
-.estado-limpio {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.3);
-  color: #bbf7d0;
-}
-
-.estado-con-caso {
-  background: rgba(249, 115, 22, 0.14);
-  border-color: rgba(249, 115, 22, 0.4);
-  color: #fed7aa;
-}
-
-.vecinos-list {
+/* Tarjeta Fija de Sesión de Productor */
+.productor-sesion-card {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 145px;
-  overflow-y: auto;
-  margin-top: 10px;
-  padding-right: 4px;
-}
-
-.vecino-item {
-  background: rgba(11, 19, 34, 0.75);
-  border: 1px solid var(--linea);
-  border-radius: 9px;
-  padding: 8px 11px;
-  font-size: 12px;
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 12px 18px;
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(12px);
+  flex-shrink: 0;
 }
 
-.agricultor-main-grid {
-  display: grid;
-  grid-template-columns: 470px minmax(0, 1fr);
-  gap: 22px;
-  align-items: start;
-}
-
-.form-title-row {
+.prod-avatar {
+  font-size: 26px;
+  background: rgba(16, 185, 129, 0.15);
+  width: 46px;
+  height: 46px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 14px;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.form-title-row h2 {
-  margin: 0;
-  font-size: 17px;
-}
-
-.tag-ia {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(168, 85, 247, 0.18);
-  color: #d8b4fe;
-  border: 1px solid rgba(168, 85, 247, 0.35);
-}
-
-#registro, .form-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-}
-
-.dos {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.campo {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.campo label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--tenue);
-}
-
-.label-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.pct-pill {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 800;
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.14);
-  padding: 2px 9px;
-  border-radius: 999px;
-}
-
-.range-pct {
-  padding: 0;
-  height: 7px;
-  accent-color: var(--primario);
-  cursor: pointer;
-}
-
-/* Ficha Guía de Plaga */
-.ficha-plaga {
-  background: rgba(11, 19, 34, 0.85);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 10px;
-  padding: 10px 13px;
-  font-size: 12px;
-  animation: fadeSlideUp 0.25s ease;
-}
-
-.ficha-plaga-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.ficha-plaga-top em {
-  color: var(--tenue);
-  font-size: 11.5px;
-  margin-left: 6px;
-}
-
-.badge-esp {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(16, 185, 129, 0.18);
-  color: #6ee7b7;
-}
-
-.ficha-sintomas-tit {
-  margin: 0 0 4px;
-  color: var(--tenue);
-  font-weight: 600;
-  font-size: 11px;
-}
-
-.ficha-sintomas-list {
-  margin: 0;
-  padding-left: 16px;
-  color: var(--texto-sec);
+.prod-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.metricas-geometria {
-  display: flex;
-  justify-content: space-between;
-  background: rgba(10, 17, 30, 0.85);
-  border: 1px solid var(--linea);
-  padding: 9px 12px;
-  border-radius: 9px;
+.prod-badge-verified {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #34d399;
+}
+
+.prod-info strong {
+  font-size: 14.5px;
+  color: #ffffff;
+}
+
+.prod-sub {
   font-size: 11.5px;
   color: var(--tenue);
 }
 
-.metricas-geometria strong {
-  color: #38bdf8;
-  font-family: var(--mono);
+/* Barra de Pestañas de Parcelas (Aislamiento de Sesión) */
+.agr-parcelas-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0;
+  padding: 12px 18px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  backdrop-filter: blur(8px);
+  flex-wrap: wrap;
 }
 
-/* Tarjeta Semáforo & Desglose Matemático */
-.tarjeta-semaforo {
+.agr-parcelas-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #a7f3d0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 12px;
-  border: 1px solid var(--linea-fuerte);
-  background: rgba(10, 17, 30, 0.9);
-  transition: all 0.25s ease;
+  align-items: center;
+  gap: 6px;
 }
 
-.semaforo-top-row {
+.agr-parcelas-tabs {
   display: flex;
-  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.parcela-tab {
+  display: flex;
   align-items: center;
   gap: 10px;
+  background: rgba(11, 19, 34, 0.85);
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  padding: 8px 14px;
+  color: var(--texto-sec);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font: inherit;
+  text-align: left;
 }
 
-.semaforo-main-badge {
+.parcela-tab:hover {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #ffffff;
+}
+
+.parcela-tab.active {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(6, 95, 70, 0.35));
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.25);
+}
+
+.parcela-tab .tab-icon {
+  font-size: 18px;
+}
+
+.parcela-tab .tab-info {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
 }
 
-.indicador-circulo {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #64748b;
-  flex-shrink: 0;
-  transition: all 0.25s ease;
-}
-
-.s-rojo { border-color: rgba(239, 68, 68, 0.5); }
-.s-rojo .indicador-circulo { background: var(--rojo); box-shadow: 0 0 16px var(--rojo); }
-
-.s-naranja { border-color: rgba(249, 115, 22, 0.5); }
-.s-naranja .indicador-circulo { background: var(--naranja); box-shadow: 0 0 16px var(--naranja); }
-
-.s-amarillo { border-color: rgba(234, 179, 8, 0.45); }
-.s-amarillo .indicador-circulo { background: var(--amarillo); box-shadow: 0 0 14px var(--amarillo); }
-
-.s-verde { border-color: rgba(34, 197, 94, 0.45); }
-.s-verde .indicador-circulo { background: var(--verde); box-shadow: 0 0 14px var(--verde); }
-
-.tit-sem { font-size: 14px; font-weight: 800; }
-.sub-sem { font-size: 12px; color: var(--texto-sec); }
-
-.sim-brote-badge {
-  font-size: 11px;
+.parcela-tab .tab-info strong {
+  font-size: 13px;
   font-weight: 700;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.14);
+}
+
+.parcela-tab .tab-info small {
+  font-size: 11px;
   color: var(--tenue);
 }
 
-.sim-brote-badge.activo {
-  background: rgba(249, 115, 22, 0.22);
-  color: #fb923c;
-  border: 1px solid rgba(249, 115, 22, 0.5);
+.parcela-tab.active .tab-info small {
+  color: #a7f3d0;
 }
 
-.desglose-factores {
+/* Tarjeta de Estado de Visita Técnica y Alertas Críticas */
+.agr-visita-status-box {
+  margin-bottom: 22px;
+}
+
+.visita-card {
   display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding-top: 8px;
-  border-top: 1px solid var(--linea);
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--linea);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
 }
 
-.factor-row {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.visita-card.visita-limpia {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 78, 59, 0.2));
+  border-color: rgba(16, 185, 129, 0.3);
 }
 
-.factor-labels {
+.visita-card.visita-activa {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(154, 52, 18, 0.25));
+  border-color: rgba(249, 115, 22, 0.45);
+  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.15);
+}
+
+.visita-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.visita-content {
+  flex: 1;
+}
+
+.visita-top {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.badge-visita-urgente {
   font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.badge-visita-ok {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.visita-tiempo {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fdba74;
+}
+
+.visita-content h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: #ffffff;
+}
+
+.visita-content p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--texto-sec);
+  line-height: 1.45;
+}
+
+/* Cuadrícula Principal */
+.agricultor-main-grid {
+  display: grid;
+  grid-template-columns: 490px minmax(0, 1fr);
+  gap: 22px;
+  align-items: stretch;
+}
+
+/* Panel del Chat de Asistencia Multimodal */
+.panel-chat-box {
+  display: flex;
+  flex-direction: column;
+  height: 640px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--linea-fuerte);
+  background: rgba(11, 19, 34, 0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border-radius: 16px;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid var(--linea);
+}
+
+.chat-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chat-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981, #047857);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);
+}
+
+.chat-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-title-row h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.chat-online-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #34d399;
+}
+
+.chat-subtitle {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--tenue);
+}
+
+.chat-parcela-tag {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+
+.chat-mensajes-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-behavior: smooth;
+}
+
+/* Burbujas de chat */
+.chat-msg {
+  display: flex;
+  gap: 10px;
+  max-width: 90%;
+  animation: fadeSlideUp 0.25s ease;
+}
+
+.chat-msg-bot {
+  align-self: flex-start;
+}
+
+.chat-msg-user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.chat-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.chat-bubble {
+  padding: 12px 16px;
+  border-radius: 16px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  position: relative;
+}
+
+.chat-msg-bot .chat-bubble {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(71, 85, 105, 0.4);
+  color: #f1f5f9;
+  border-bottom-left-radius: 4px;
+}
+
+.chat-msg-user .chat-bubble {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #ffffff;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+}
+
+.chat-time {
+  display: block;
+  font-size: 10.5px;
+  margin-top: 5px;
+  opacity: 0.7;
+  text-align: right;
+}
+
+/* Tarjeta rica de respuesta del Asistente */
+.chat-reporte-card {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-reporte-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #38bdf8;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.2);
+  padding-bottom: 6px;
+}
+
+.chat-reporte-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+}
+
+.chat-reporte-item strong {
+  color: #ffffff;
+}
+
+.chat-reporte-item span {
   color: var(--texto-sec);
 }
 
-.factor-bar-bg {
-  height: 5px;
-  background: rgba(148, 163, 184, 0.15);
-  border-radius: 999px;
+.chat-sintomas-quote {
+  font-style: italic;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px 10px;
+  border-left: 3px solid #10b981;
+  border-radius: 4px;
+  margin: 6px 0;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.chat-media-preview-bubble {
+  margin-top: 8px;
+  border-radius: 8px;
   overflow: hidden;
+  max-width: 240px;
 }
 
-.factor-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--primario), var(--azul));
+.chat-media-preview-bubble img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  cursor: pointer;
+}
+
+/* Chips rápidos de sugerencia */
+.chat-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.quick-chip-btn {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 5px 11px;
   border-radius: 999px;
-  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #a7f3d0;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.sim-tecnico-row {
+.quick-chip-btn:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Typing indicator */
+.chat-typing-row {
+  padding: 0 18px 10px;
+}
+
+.typing-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 41, 59, 0.7);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--tenue);
+  border: 1px solid var(--linea);
+}
+
+.typing-dots span {
+  animation: blinkDots 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blinkDots {
+  0%, 20% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Barra de previsualización de adjuntos */
+.chat-adjuntos-bar {
+  padding: 10px 16px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid var(--linea);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.adjunto-chip {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(30, 41, 59, 0.55);
-  padding: 8px 11px;
-  border-radius: 8px;
-  font-size: 12px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 10px;
+  padding: 6px 10px;
 }
 
-.sim-tec-info {
+.adjunto-thumb {
+  width: 42px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--linea);
+}
+
+.adjunto-chip-info {
   display: flex;
   flex-direction: column;
 }
 
-.sim-tec-label {
+.adjunto-chip-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.adjunto-chip-sub {
   font-size: 10.5px;
   color: var(--tenue);
 }
 
-.btn-submit-glow {
-  font: inherit;
-  font-weight: 700;
-  font-size: 14px;
-  padding: 12px 16px;
+.adjunto-chip-icon {
+  font-size: 22px;
+}
+
+.adjunto-audio-mini {
+  height: 32px;
+  max-width: 170px;
+}
+
+.btn-adjunto-del {
+  background: rgba(239, 68, 68, 0.2);
   border: 0;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: #ffffff;
+  color: #fca5a5;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.btn-submit-glow:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
-}
-
-.estado {
-  margin: 4px 0 0;
-  font-size: 12.5px;
-  color: #6ee7b7;
-  min-height: 18px;
-}
-
-.panel-derecho {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 4px;
 }
 
-.mapa-header {
+.btn-adjunto-del:hover {
+  background: rgba(239, 68, 68, 0.4);
+  color: #ffffff;
+}
+
+/* Grabación activa banner */
+.chat-grabando-banner {
+  padding: 10px 18px;
+  background: rgba(220, 38, 38, 0.15);
+  border-top: 1px solid rgba(239, 68, 68, 0.35);
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+}
+
+.grabando-indicador {
+  display: flex;
+  align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: #fca5a5;
+}
+
+.rec-pulse-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 10px #ef4444;
+  animation: blinkDot 1s infinite;
+}
+
+@keyframes blinkDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.grabando-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-rec-stop {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #10b981;
+  color: #ffffff;
+  border: 0;
+  cursor: pointer;
+}
+
+.btn-rec-cancel {
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Barra de entrada multimodal */
+.chat-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid var(--linea);
+}
+
+.btn-chat-attach {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid var(--linea);
+  color: var(--texto-sec);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-chat-attach:hover {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.chat-input-wrap {
+  flex: 1;
+}
+
+.chat-input-wrap textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(10, 17, 30, 0.9);
+  border: 1px solid var(--linea);
+  color: #ffffff;
+  font: inherit;
+  font-size: 13.5px;
+  resize: none;
+  max-height: 90px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.chat-input-wrap textarea:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+.btn-chat-send {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 0;
+  color: #ffffff;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 12px rgba(16, 185, 129, 0.4);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-chat-send:hover {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: 0 5px 16px rgba(16, 185, 129, 0.55);
+}
+
+/* Panel del Mapa Satelital Fitosanitario */
+.panel-mapa-box {
+  display: flex;
+  flex-direction: column;
+  height: 640px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--linea-fuerte);
+  background: rgba(11, 19, 34, 0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border-radius: 16px;
+}
+
+.mapa-header-agri {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid var(--linea);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mapa-header-tit h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.mapa-metrics-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #fca5a5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.mapa-metrics-pill strong {
+  color: #ffffff;
+  font-family: var(--mono);
+}
+
+.dot-danio {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+}
+
+.mapa-satelital-lienzo {
+  flex: 1;
+  width: 100%;
+  min-height: 400px;
+  background: #0b1322;
+}
+
+.mapa-danio-toolbar {
+  padding: 12px 18px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid var(--linea);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.danio-quick-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.ayuda-mapa {
+.danio-lbl, .slider-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--tenue);
+  margin-right: 4px;
+}
+
+.btn-danio-chip {
+  font: inherit;
   font-size: 11.5px;
   font-weight: 600;
-  color: #38bdf8;
-  background: rgba(56, 189, 248, 0.12);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  padding: 4px 10px;
-  border-radius: 999px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.75);
+  border: 1px solid var(--linea);
+  color: var(--texto-sec);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danio-chip:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ffffff;
+}
+
+.btn-danio-chip.active {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(185, 28, 28, 0.4));
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-danio-clear {
+  margin-left: auto;
+  font: inherit;
+  font-size: 11.5px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--linea);
+  color: var(--tenue);
+  cursor: pointer;
+}
+
+.btn-danio-clear:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.danio-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.range-pct-agri {
+  flex: 1;
+  height: 6px;
+  accent-color: #ef4444;
+  cursor: pointer;
+}
+
+.slider-val-badge {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  padding: 2px 8px;
+  border-radius: 6px;
+  min-width: 44px;
+  text-align: center;
+}
+
+/* Pin táctil de daño */
+.danio-pin-wrapper {
+  position: relative;
+}
+
+.danio-pin-core {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.danio-pin-dot {
+  font-size: 20px;
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+}
+
+.danio-pin-pulse {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.45);
+  animation: pinPulseRing 1.6s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  z-index: 1;
+}
+
+@keyframes pinPulseRing {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.parcela-tooltip-label {
+  background: rgba(11, 19, 34, 0.9) !important;
+  border: 1px solid #10b981 !important;
+  color: #a7f3d0 !important;
+  font-weight: 700 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+  font-size: 12px !important;
+  padding: 4px 9px !important;
+}
+
+@media (max-width: 1024px) {
+  .agricultor-main-grid {
+    grid-template-columns: 1fr;
+  }
+  .panel-chat-box, .panel-mapa-box {
+    height: 540px;
+  }
 }
 
 /* ============================================================================
@@ -1607,13 +2132,39 @@ tbody tr:hover {
    ESTILOS: LANDING PAGE & SELECTOR DE PORTALES
    ============================================================================ */
 .brand-area {
+  display: flex;
+  align-items: center;
+  gap: 14px;
   cursor: pointer;
   user-select: none;
   transition: opacity 0.2s ease;
 }
 
 .brand-area:hover {
-  opacity: 0.9;
+  opacity: 0.95;
+}
+
+.brand-area:hover .logo-fitosanitario {
+  transform: scale(1.05);
+}
+
+.brand-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logo-fitosanitario {
+  width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 2px 8px rgba(16, 185, 129, 0.45));
+  transition: transform 0.25s ease;
+}
+
+.brand-text-block {
+  display: flex;
+  flex-direction: column;
 }
 
 .topbar-actions {
