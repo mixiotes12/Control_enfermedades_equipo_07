@@ -346,6 +346,7 @@ let marcadorDanio = null;
 let circuloDanio = null;
 let puntoDanioActual = null;
 let pctDanioActual = 10;
+const puntosDanioPorParcela = new Map();
 
 
 // ============================================================================
@@ -449,7 +450,23 @@ function cambiarVista(nuevaVista, actualizarHistorial = true) {
   // Reajustar tamaño del lienzo Leaflet tras mostrar la pestaña
   setTimeout(() => {
     if (nuevaVista === "tecnico" && mapTecnico) mapTecnico.invalidateSize();
-    if (nuevaVista === "agricultor" && mapAgricultor) mapAgricultor.invalidateSize();
+    if (nuevaVista === "agricultor" && mapAgricultor) {
+      mapAgricultor.invalidateSize();
+      if (estadoApp.parcelaActual) {
+        const p = estadoApp.parcelaActual;
+        const ladoMetros = Math.sqrt(Number(p.superficie_ha) * 10000);
+        const deltaLat = ladoMetros / 111320 / 2;
+        const deltaLon = ladoMetros / (111320 * Math.cos((Number(p.lat) * Math.PI) / 180)) / 2;
+        const bounds = [
+          [Number(p.lat) - deltaLat, Number(p.lon) - deltaLon],
+          [Number(p.lat) + deltaLat, Number(p.lon) + deltaLon],
+        ];
+        mapAgricultor.setMaxBounds(null);
+        mapAgricultor.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        const maxBounds = L.latLngBounds(bounds).pad(1.2);
+        mapAgricultor.setMaxBounds(maxBounds);
+      }
+    }
   }, 120);
 }
 
@@ -662,6 +679,8 @@ function inicializarEventosAuth() {
     try {
       localStorage.removeItem("alerta_plaga_sesion");
     } catch {}
+    chatHistorialParcelas.clear();
+    puntosDanioPorParcela.clear();
     actualizarBadgeSesion(null);
     document.querySelector("#nav-coordinador")?.classList.add("oculto");
     cambiarVista("landing");
@@ -1290,7 +1309,9 @@ function renderizarPestanasParcelasProductor(productorId) {
     return;
   }
 
-  const activaId = estadoApp.parcelaActual?.id || parcelasIds[0];
+  const activaId = parcelasIds.includes(estadoApp.parcelaActual?.id)
+    ? estadoApp.parcelaActual.id
+    : parcelasIds[0];
 
   parcelasIds.forEach((pId) => {
     const p = mapaParcelas.get(pId);
@@ -1454,6 +1475,8 @@ function seleccionarParcelaAgricultor(parcelaId) {
     [Number(p.lat) + deltaLat, Number(p.lon) + deltaLon],
   ];
 
+  // Liberar restricción previa antes de fitBounds para permitir mover la cámara a otra parcela
+  mapAgricultor.setMaxBounds(null);
   mapAgricultor.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
 
   // Bloquear navegación fuera de la parcela
@@ -1478,13 +1501,20 @@ function seleccionarParcelaAgricultor(parcelaId) {
   });
 
   poligonoParcela.on("click", (e) => {
+    if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
     puntoDanioActual = [e.latlng.lat, e.latlng.lng];
+    puntosDanioPorParcela.set(p.id, puntoDanioActual);
     actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
     mostrarToast(`📍 Foco de afección marcado en la parcela (${pctDanioActual}%)`);
   });
 
-  // Colocar o centrar foco de daño en la parcela
-  puntoDanioActual = [Number(p.lat), Number(p.lon)];
+  // Colocar o recuperar foco de daño en la parcela
+  if (puntosDanioPorParcela.has(p.id)) {
+    puntoDanioActual = puntosDanioPorParcela.get(p.id);
+  } else {
+    puntoDanioActual = [Number(p.lat), Number(p.lon)];
+    puntosDanioPorParcela.set(p.id, puntoDanioActual);
+  }
   actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
 
   // Inicializar o refrescar chat conversacional para esta parcela
@@ -1777,6 +1807,13 @@ function crearElementoMensaje(m) {
     });
   });
 
+  // Listener para ampliar fotos de evidencia en nueva pestaña
+  div.querySelectorAll(".chat-media-preview-bubble img").forEach((img) => {
+    img.addEventListener("click", () => {
+      window.open(img.src, "_blank");
+    });
+  });
+
   return div;
 }
 
@@ -1830,17 +1867,26 @@ async function procesarEnvioChat(textoMensaje) {
       const tec = casoActivo ? mapaTecnicos.get(casoActivo.tecnico_id) : diag.tecnico;
       textoRespuesta = `He consultado el estado de tu reporte en sistema. Tu parcela <strong>${escaparHtml(p.id)}</strong> tiene programada la inspección con el <strong>${tec ? `${tec.nombre} (${tec.especialidad})` : "técnico de campo"}</strong>. Si notas un incremento en la zona dañada o nuevos síntomas, mantén el área delimitada en el mapa satelital.`;
     } else {
+      const plagaObj = diag.plaga || { id: "plaga_campo", nombre: "Afección fitosanitaria" };
+      const reglaObj = diag.regla || {
+        descripcion: "Monitoreo preventivo de síntomas foliares",
+        consejo: "Mantén vigilancia sobre el cultivo y reporta cualquier evolución o cambio en los síntomas.",
+      };
+      const semaforoVal = diag.calc?.semaforo || "amarillo";
+      const prioridadVal = diag.calc?.prioridad || 50;
+      const tiempoVisitaVal = diag.calc?.tiempoVisita || "menos de 48 horas";
+
       textoRespuesta = `✅ <strong>Hemos recibido y canalizado tu reporte con éxito.</strong> El motor de sanidad vegetal ha procesado tus síntomas y evidencia.`;
       reporteCard = {
         folio: folioNuevo,
-        semaforo: diag.calc.semaforo,
-        diagnostico: `${diag.plaga.nombre} (${diag.regla.descripcion})`,
-        prioridad: diag.calc.prioridad,
+        semaforo: semaforoVal,
+        diagnostico: `${plagaObj.nombre} (${reglaObj.descripcion})`,
+        prioridad: prioridadVal,
         pct: diag.pct,
         tecnico: diag.tecnico ? `${diag.tecnico.nombre} (${diag.tecnico.especialidad} · Base ${diag.tecnico.base})` : "Coordinación Fitosanitaria",
-        tiempoVisita: diag.calc.tiempoVisita,
+        tiempoVisita: tiempoVisitaVal,
         brote: diag.brote,
-        consejo: diag.regla.consejo,
+        consejo: reglaObj.consejo,
       };
 
       // Guardar en bitácora oficial
@@ -1848,11 +1894,11 @@ async function procesarEnvioChat(textoMensaje) {
         fecha: new Date().toLocaleDateString("en-CA"),
         parcela: `${p.id} · ${p.nombre} (${p.municipio})`,
         cultivo: p.cultivo,
-        actividad: `Reporte ${folioNuevo}: ${diag.plaga.nombre} (${diag.pct}% daño)`,
-        observaciones: `${textoMensaje ? `${textoMensaje} · ` : ""}Semáforo ${diag.calc.semaforo.toUpperCase()} (${diag.calc.prioridad} pts) · Técnico: ${diag.tecnico ? `${diag.tecnico.id} ${diag.tecnico.nombre}` : "En turno"}${tieneFoto ? " · [Con Foto]" : ""}${tieneAudio ? " · [Con Nota de Voz]" : ""}`,
+        actividad: `Reporte ${folioNuevo}: ${plagaObj.nombre} (${diag.pct}% daño)`,
+        observaciones: `${textoMensaje ? `${textoMensaje} · ` : ""}Semáforo ${semaforoVal.toUpperCase()} (${prioridadVal} pts) · Técnico: ${diag.tecnico ? `${diag.tecnico.id} ${diag.tecnico.nombre}` : "En turno"}${tieneFoto ? " · [Con Foto]" : ""}${tieneAudio ? " · [Con Nota de Voz]" : ""}`,
         pct: diag.pct,
-        semaforo: diag.calc.semaforo,
-        prioridad: diag.calc.prioridad,
+        semaforo: semaforoVal,
+        prioridad: prioridadVal,
         tecnico_id: diag.tecnico?.id || null,
       };
       await guardarEntradaBitacora(nuevaEntrada);
@@ -1862,11 +1908,11 @@ async function procesarEnvioChat(textoMensaje) {
         reporte_id: folioNuevo,
         recibido: new Date().toISOString(),
         parcela_id: p.id,
-        plaga: diag.plaga.id,
+        plaga: plagaObj.id,
         lat: p.lat,
         lon: p.lon,
-        semaforo: diag.calc.semaforo,
-        prioridad: diag.calc.prioridad,
+        semaforo: semaforoVal,
+        prioridad: prioridadVal,
         tecnico_id: diag.tecnico?.id || null,
         brote: diag.brote,
       });
@@ -1911,6 +1957,9 @@ function inicializarEventosPortalAgricultor() {
   // Toque / Clic en el mapa satelital para ubicar el foco de daño
   mapAgricultor.on("click", (e) => {
     puntoDanioActual = [e.latlng.lat, e.latlng.lng];
+    if (estadoApp.parcelaActual) {
+      puntosDanioPorParcela.set(estadoApp.parcelaActual.id, puntoDanioActual);
+    }
     actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
     mostrarToast(`📍 Foco de afección marcado en la parcela (${pctDanioActual}%)`);
   });
@@ -1936,9 +1985,25 @@ function inicializarEventosPortalAgricultor() {
   // Botón centrar / restablecer daño
   document.querySelector("#btn-limpiar-danio")?.addEventListener("click", () => {
     if (estadoApp.parcelaActual) {
-      puntoDanioActual = [Number(estadoApp.parcelaActual.lat), Number(estadoApp.parcelaActual.lon)];
+      const p = estadoApp.parcelaActual;
+      puntoDanioActual = [Number(p.lat), Number(p.lon)];
+      puntosDanioPorParcela.set(p.id, puntoDanioActual);
       pctDanioActual = 10;
       actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
+
+      // Re-centrar vista del mapa en la parcela
+      const ladoMetros = Math.sqrt(Number(p.superficie_ha) * 10000);
+      const deltaLat = ladoMetros / 111320 / 2;
+      const deltaLon = ladoMetros / (111320 * Math.cos((Number(p.lat) * Math.PI) / 180)) / 2;
+      const bounds = [
+        [Number(p.lat) - deltaLat, Number(p.lon) - deltaLon],
+        [Number(p.lat) + deltaLat, Number(p.lon) + deltaLon],
+      ];
+      mapAgricultor.setMaxBounds(null);
+      mapAgricultor.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+      const maxBounds = L.latLngBounds(bounds).pad(1.2);
+      mapAgricultor.setMaxBounds(maxBounds);
+
       mostrarToast("↺ Foco de daño centrado en la parcela (10%)");
     }
   });
@@ -1990,6 +2055,15 @@ function inicializarEventosPortalAgricultor() {
   const btnDetenerAudio = document.querySelector("#btn-detener-audio");
   const btnCancelarAudio = document.querySelector("#btn-cancelar-audio");
 
+  let grabacionCancelada = false;
+
+  const formatearDuracion = (segundos) => {
+    const s = Math.max(1, Number(segundos) || 1);
+    const m = Math.floor(s / 60);
+    const resto = s % 60;
+    return `${m}:${resto < 10 ? `0${resto}` : resto} s`;
+  };
+
   const detenerGrabacion = () => {
     if (grabacionTimer) clearInterval(grabacionTimer);
     bannerGrabando?.classList.add("oculto");
@@ -1999,15 +2073,16 @@ function inicializarEventosPortalAgricultor() {
       try {
         mediaRecorder.stop();
       } catch {}
-    } else {
+    } else if (!grabacionCancelada) {
       // Simulación de audio si no hubo MediaRecorder activo
       finalizarCapturaAudio(null, grabacionSegundos || 4);
     }
   };
 
   const finalizarCapturaAudio = (blob, durSegundos) => {
+    if (grabacionCancelada) return;
     const url = blob ? URL.createObjectURL(blob) : generarAudioTono();
-    const durTxt = `0:0${durSegundos || 4} s`;
+    const durTxt = formatearDuracion(durSegundos || 4);
     audioAdjuntoActual = { url, duracion: durTxt };
 
     const bar = document.querySelector("#chat-adjuntos-bar");
@@ -2028,6 +2103,7 @@ function inicializarEventosPortalAgricultor() {
       return;
     }
 
+    grabacionCancelada = false;
     grabacionActiva = true;
     grabacionSegundos = 0;
     if (timerEl) timerEl.textContent = "0:00";
@@ -2035,7 +2111,9 @@ function inicializarEventosPortalAgricultor() {
 
     grabacionTimer = setInterval(() => {
       grabacionSegundos++;
-      if (timerEl) timerEl.textContent = `0:${grabacionSegundos < 10 ? `0${grabacionSegundos}` : grabacionSegundos}`;
+      const m = Math.floor(grabacionSegundos / 60);
+      const s = grabacionSegundos % 60;
+      if (timerEl) timerEl.textContent = `${m}:${s < 10 ? `0${s}` : s}`;
     }, 1000);
 
     // Intentar grabación con MediaRecorder del navegador
@@ -2043,13 +2121,30 @@ function inicializarEventosPortalAgricultor() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         audioChunks = [];
-        mediaRecorder = new MediaRecorder(stream);
+
+        let mimeType = "";
+        if (typeof MediaRecorder.isTypeSupported === "function") {
+          if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+            mimeType = "audio/webm;codecs=opus";
+          } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+            mimeType = "audio/mp4";
+          } else if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+            mimeType = "audio/ogg;codecs=opus";
+          }
+        }
+
+        mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
         mediaRecorder.ondataavailable = (e) => {
-          if (e.data.size > 0) audioChunks.push(e.data);
+          if (e.data && e.data.size > 0) audioChunks.push(e.data);
         };
         mediaRecorder.onstop = () => {
           stream.getTracks().forEach((track) => track.stop());
-          const blob = new Blob(audioChunks, { type: "audio/ogg; codecs=opus" });
+          if (grabacionCancelada) {
+            audioChunks = [];
+            return;
+          }
+          const blobType = mediaRecorder.mimeType || mimeType || "audio/webm";
+          const blob = new Blob(audioChunks, { type: blobType });
           finalizarCapturaAudio(blob, grabacionSegundos || 1);
         };
         mediaRecorder.start();
@@ -2060,15 +2155,20 @@ function inicializarEventosPortalAgricultor() {
     }
   });
 
-  btnDetenerAudio?.addEventListener("click", detenerGrabacion);
+  btnDetenerAudio?.addEventListener("click", () => {
+    grabacionCancelada = false;
+    detenerGrabacion();
+  });
 
   btnCancelarAudio?.addEventListener("click", () => {
+    grabacionCancelada = true;
     if (grabacionTimer) clearInterval(grabacionTimer);
     bannerGrabando?.classList.add("oculto");
     grabacionActiva = false;
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       try { mediaRecorder.stop(); } catch {}
     }
+    audioChunks = [];
     mostrarToast("Grabación de audio cancelada");
   });
 
@@ -2454,7 +2554,7 @@ async function sincronizarDatosEnVivo(mostrarNotificacion = false) {
       renderizarKPIs();
       actualizarVistaTecnico();
       if (estadoApp.parcelaActual) {
-        seleccionarParcelaAgricultor(estadoApp.parcelaActual.id);
+        actualizarBannerVisitaParcela(estadoApp.parcelaActual.id);
       }
       renderizarFeedAvisosOficiales();
       renderizarTablasBitacora();

@@ -2658,4 +2658,29 @@ tbody tr:hover {
   .kpi-ribbon, .filtros-bar, .dos, .modal-grid-2, .tecnicos-scroll-grid {
     grid-template-columns: 1fr;
   }
+  .panel-chat-box, .panel-mapa-box {
+    height: 500px;
+  }
+  .chat-msg {
+    max-width: 96%;
+  }
+  .banner-brand-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .productor-sesion-card {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .btn-chat-attach, .btn-chat-send {
+    min-width: 42px;
+    min-height: 42px;
+  }
+  .danio-quick-pills {
+    justify-content: flex-start;
+  }
+  .btn-danio-clear {
+    margin-left: 0;
+  }
 }
