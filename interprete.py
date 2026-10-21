@@ -19,21 +19,25 @@ CATALOGO_PLAGAS = """
 SYSTEM_PROMPT = f"""Eres un clasificador experto de sanidad vegetal de la Junta Local de Texcoco.
 Analizas mensajes enviados por agricultores (texto, audio transcrito o fotos con descripción) y decides:
 
-1. "es_plaga": true para cualquier reporte sobre plagas o enfermedades en cultivos, INCLUYENDO seguimientos de casos previos ("¿ya vienen a revisar lo de ayer?", "sigue igual", "¿qué pasó con mi reporte?").
-   false ÚNICAMENTE si son mensajes de trámites de fertilizante, horarios de oficina, agradecimientos, saludos aislados, bromas o temas ajenos a la sanidad vegetal.
-2. "es_seguimiento": true si el mensaje se refiere a una visita o reporte anterior ("¿vienen hoy?", "sigue igual", "¿qué pasó con mi visita?", "lo de ayer").
-   false si describe un caso nuevo o si no es plaga.
+1. "es_plaga": true para cualquier reporte sobre plagas o enfermedades en cultivos, INCLUYENDO seguimientos de casos previos: cualquier mensaje que se refiera a un reporte o visita que el productor ya hizo ("¿ya vienen a revisar lo de ayer?", "sigue igual", "¿qué pasó con mi reporte?", "nomás para confirmar que les llegó mi reporte", "¿ya mandaron al técnico?").
+   false ÚNICAMENTE si son mensajes de trámites de fertilizante, horarios de oficina, pedidos o paquetes ajenos (postales, etc.), pláticas, agradecimientos o saludos aislados SIN referencia a un reporte, bromas o temas ajenos a la sanidad vegetal.
+2. "es_seguimiento": true ÚNICAMENTE si el mensaje NO describe síntomas nuevos y solo pregunta por un reporte previo ("¿ya vienen a revisar lo de ayer?", "¿cuándo van a venir a ver el gusano?", "sigue igual que ayer").
+   false si el mensaje describe los síntomas por primera vez, detalla daños o pide auxilio con un reporte nuevo (frases de cortesía como "quedo pendiente" o "espero su ayuda" al final NO son seguimientos).
 3. "plaga": El id exacto de la plaga del catálogo:
 {CATALOGO_PLAGAS}
    - Si es un seguimiento que no menciona la plaga, o si los síntomas no coinciden con ninguna del catálogo, usa "desconocida". NUNCA inventes nombres.
    - Si es_plaga es false, usa null.
 4. "pct": Porcentaje de parcela afectada (0 a 100).
-   - Extraer de frases: "la mitad" -> 50, "un cuarto" o "una de cuatro" -> 25, "tres cuartas partes" -> 75, "toda la parcela" -> 100, "como el 30%" -> 30.
+   - Extraer de frases: "la mitad" -> 50, "un cuarto" o "una de cada cuatro" -> 25, "tres cuartas partes" -> 75, "una quinta parte" o "una de cada cinco" -> 20, "una décima parte" o "una de cada diez" -> 10, "una tercera parte" -> 33, "dos terceras partes" -> 67, "toda la parcela" -> 100, "como el 30%" -> 30. Convierte la fracción exacta, sin redondear a otra.
    - Si no lo menciona o no se deduce, devuelve 10 (valor por defecto según las reglas).
    - Si es_plaga es false, usa null.
 
+5. "confianza": "alta", "media" o "baja" sobre la plaga elegida. Usa "baja" si los síntomas o la imagen no permiten distinguirla con claridad.
+
+FOTOS: si viene una imagen, identifica lo que SE VE en ella (qué insecto, qué tipo de daño o mancha). La imagen manda sobre el cultivo de la parcela: el cultivo es solo contexto y NO debe llevarte a elegir una plaga que no se ve en la foto. Si en la foto hay un insecto, nómbralo por su aspecto (p. ej. un saltamontes verde es "chapulin").
+
 IMPORTANTE: Responde ÚNICAMENTE un objeto JSON válido con estas claves:
-{{"es_plaga": bool, "es_seguimiento": bool, "plaga": str|null, "pct": int|null, "razon": str}}
+{{"es_plaga": bool, "es_seguimiento": bool, "plaga": str|null, "pct": int|null, "confianza": str, "razon": str}}
 """
 
 def transcribir_audio(audio_bytes, api_key):
@@ -89,8 +93,11 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
             "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
         })
 
+    # Las fotos requieren un modelo de visión más fuerte; texto y voz transcrita van con el mini (más rápido).
+    modelo = "openai/gpt-4o" if foto_bytes else "openai/gpt-4o-mini"
+
     payload = {
-        "model": "openai/gpt-4o-mini",
+        "model": modelo,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_content}
@@ -115,6 +122,10 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
 
         # Regla Oficial Sección 6 y 9: Si es seguimiento y no trae plaga, 'desconocida' es correcto.
         if parsed.get("es_seguimiento") and (not parsed.get("plaga") or parsed.get("plaga") == "null"):
+            parsed["plaga"] = "desconocida"
+
+        # Con baja confianza es mejor "desconocida" (0 puntos) que arriesgar plaga, semáforo y técnico (hasta -3).
+        if parsed.get("es_plaga") and parsed.get("confianza") == "baja" and parsed.get("plaga") not in (None, "desconocida"):
             parsed["plaga"] = "desconocida"
 
         return parsed

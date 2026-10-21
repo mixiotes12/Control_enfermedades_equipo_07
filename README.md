@@ -139,6 +139,11 @@ Procesa lenguaje natural con el modelo multimodal vía OpenRouter:
   - **Fotos (`.jpg`):** Análisis visual directo con `openai/gpt-4o-mini` para identificar plagas sobre el follaje y hojas.
   - **Notas de voz (`.ogg`):** Transcripción de audios en la nube usando el modelo omni `qwen/qwen3.8-omni-flash`.
 - **Pipeline de Validación:** `procesar_reportes.py` orquesta la descarga de archivos multimedia, consulta de catálogos y validación con `POST /casos/validar`.
+- **Ajustes de precisión (tras los primeros 24 casos registrados):**
+  - Los mensajes que refieren a un reporte ya hecho ("confirmar que les llegó mi reporte") cuentan como `es_plaga: true` (seguimiento); los pedidos ajenos (postales, fertilizante) siguen siendo `false`.
+  - En fotos, la imagen manda sobre el cultivo de la parcela (evita que el cultivo sesgue la plaga) y se usa `openai/gpt-4o` para visión; texto y voz transcrita siguen con `gpt-4o-mini`.
+  - Fracciones exactas del productor ("una quinta parte" = 20 %, etc.) para que la prioridad coincida.
+  - Umbral de confianza: si la IA marca confianza `baja`, la plaga se registra como `"desconocida"` (0 puntos) en vez de arriesgar plaga, semáforo y técnico.
 
 ## Llaves
 
