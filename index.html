@@ -3,62 +3,118 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Bitácora de parcela</title>
+  <title>Alerta Plaga · Control Sanitario Agrícola</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 </head>
 <body>
   <header>
-    <h1>Bitácora de parcela</h1>
+    <div class="header-contenido">
+      <div>
+        <span class="badge">Equipo 07 · DIMA Chapingo</span>
+        <h1>Alerta Plaga: Bitácora & Monitoreo Geoespacial</h1>
+      </div>
+      <div id="usuario-sesion" class="usuario-sesion">
+        <span id="productor-nombre">Productor: Don Jacinto (PR-101)</span>
+        <button id="btn-cambiar-productor" class="btn-secundario">Cambiar</button>
+      </div>
+    </div>
   </header>
 
   <main>
-    <form id="registro" class="tarjeta">
-      <div class="dos">
-        <div class="campo">
-          <label for="fecha">Fecha</label>
-          <input id="fecha" type="date" name="fecha" required>
+    <!-- Columna Izquierda: Formulario de Reporte y Marcado de Daño -->
+    <section class="tarjeta panel-formulario">
+      <h2>Reportar Afección de Parcela</h2>
+      <form id="registro">
+        <div class="dos">
+          <div class="campo">
+            <label for="fecha">Fecha</label>
+            <input id="fecha" type="date" name="fecha" required>
+          </div>
+          <div class="campo">
+            <label for="parcela">Parcela Asignada</label>
+            <select id="parcela" name="parcela" required>
+              <option value="">Cargando parcelas...</option>
+            </select>
+          </div>
         </div>
+
+        <div class="dos">
+          <div class="campo">
+            <label for="cultivo">Cultivo Detectado</label>
+            <input id="cultivo" type="text" name="cultivo" readonly placeholder="Se autocompleta">
+          </div>
+          <div class="campo">
+            <label for="etapa">Etapa Fenológica</label>
+            <input id="etapa" type="text" name="etapa" readonly placeholder="Ej. V8">
+          </div>
+        </div>
+
         <div class="campo">
-          <label for="cultivo">Cultivo</label>
-          <select id="cultivo" name="cultivo">
-            <option>Maíz</option>
-            <option>Frijol</option>
-            <option>Haba</option>
-            <option>Avena</option>
+          <label for="plaga">Identificación de Plaga</label>
+          <select id="plaga" name="plaga" required>
+            <option value="">Selecciona o detecta plaga...</option>
           </select>
         </div>
-      </div>
-      <div class="campo">
-        <label for="parcela">Parcela</label>
-        <select id="parcela" name="parcela">
-          <option>P-077 El Cerrito</option>
-          <option>P-012 La Loma</option>
-          <option>P-031 San Diego</option>
-        </select>
-      </div>
-      <div class="campo">
-        <label for="actividad">Actividad</label>
-        <select id="actividad" name="actividad">
-          <option>Observación</option>
-          <option>Riego</option>
-          <option>Fertilización</option>
-          <option>Muestreo</option>
-        </select>
-      </div>
-      <div class="campo">
-        <label for="observaciones">Observaciones</label>
-        <textarea id="observaciones" name="observaciones" rows="8"></textarea>
-      </div>
-      <button type="submit">Guardar registro</button>
-      <p id="estado" class="estado" role="status"></p>
-    </form>
 
-    <section class="tarjeta tabla">
-      <table id="registros">
-        <thead>
-          <tr><th>Fecha</th><th>Parcela</th><th>Cultivo</th><th>Actividad</th><th>Observaciones</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+        <!-- Área de Marcado Geoespacial -->
+        <div class="campo">
+          <label>Delimitación del Área Afectada (Dibuja el cuadro/polígono en el mapa)</label>
+          <div class="metricas-geometria">
+            <div>Superficie Total: <strong id="superficie-total">0.0 ha</strong></div>
+            <div>Área Afectada: <strong id="ha-afectadas">0.0 ha</strong></div>
+            <div>Porcentaje de Daño: <strong id="porcentaje-afectado">0%</strong></div>
+          </div>
+          <input type="hidden" id="pct_hidden" name="porcentaje" value="10">
+        </div>
+
+        <!-- Semáforo Estimado en Tiempo Real -->
+        <div id="vista-previa-semaforo" class="tarjeta-semaforo s-desconocido">
+          <div class="indicador-circulo"></div>
+          <div>
+            <div class="tit-sem">Semáforo Calculado: <span id="nombre-semaforo">Pendiente</span></div>
+            <div class="sub-sem">Prioridad: <span id="puntos-prioridad">0</span>/100 · Visita: <span id="tiempo-visita">--</span></div>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="observaciones">Observaciones o Síntomas</label>
+          <textarea id="observaciones" name="observaciones" rows="3" placeholder="Ej. Hojas raspadas en cogollo, presencia de aserrín..."></textarea>
+        </div>
+
+        <button type="submit" id="btn-enviar">Emitir Alerta & Registrar</button>
+        <p id="estado" class="estado" role="status"></p>
+      </form>
+    </section>
+
+    <!-- Columna Derecha: Mapa Interactivo y Casos Activos -->
+    <section class="panel-derecho">
+      <div class="tarjeta tarjeta-mapa">
+        <div class="mapa-header">
+          <h3>Mapa Satelital de la Parcela</h3>
+          <span class="ayuda-mapa">🖱️ Usa la herramienta de rectángulo en el mapa para marcar el daño</span>
+        </div>
+        <div id="mapa"></div>
+      </div>
+
+      <div class="tarjeta tabla">
+        <h3>Historial de Alertas y Casos Procesados</h3>
+        <table id="registros">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Parcela</th>
+              <th>Cultivo</th>
+              <th>Plaga</th>
+              <th>% Daño</th>
+              <th>Semáforo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td colspan="6">Sin registros recientes</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   </main>
 
