@@ -1,8 +1,8 @@
 import json
 import urllib.request
+import base64
 import re
 
-# Catálogo oficial de las 10 plagas para el prompt
 CATALOGO_PLAGAS = """
 1. ID: "gusano_cogollero" (Maíz). Nombres locales: gusano, gusano del cogollo, cogollero, gusano soldado. Síntomas: hojas perforadas/raspadas como ventana, excremento como aserrín en cogollo, larvas verde/café con Y invertida en cabeza.
 2. ID: "roya_frijol" (Frijol). Nombres locales: chahuixtle, roya, polvillo. Síntomas: pústulas café rojizo en envés, polvo color óxido que mancha dedos, hojas amarillas que caen.
@@ -17,7 +17,7 @@ CATALOGO_PLAGAS = """
 """
 
 SYSTEM_PROMPT = f"""Eres un clasificador experto de sanidad vegetal de la Junta Local de Texcoco.
-Analizas mensajes enviados por agricultores (vía texto o descripciones) y decides:
+Analizas mensajes enviados por agricultores (texto, audio transcrito o fotos con descripción) y decides:
 
 1. "es_plaga": true para cualquier reporte sobre plagas o enfermedades en cultivos, INCLUYENDO seguimientos de casos previos ("¿ya vienen a revisar lo de ayer?", "sigue igual", "¿qué pasó con mi reporte?").
    false ÚNICAMENTE si son mensajes de trámites de fertilizante, horarios de oficina, agradecimientos, saludos aislados, bromas o temas ajenos a la sanidad vegetal.
@@ -36,22 +36,64 @@ IMPORTANTE: Responde ÚNICAMENTE un objeto JSON válido con estas claves:
 {{"es_plaga": bool, "es_seguimiento": bool, "plaga": str|null, "pct": int|null, "razon": str}}
 """
 
-def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None):
+def transcribir_audio(audio_bytes, api_key):
     """
-    Usa el modelo de OpenRouter para interpretar el texto de un reporte.
+    Usa el modelo omni para transcribir notas de voz (.ogg) directamente en la nube.
+    """
+    audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+    payload = {
+        "model": "qwen/qwen3.8-omni-flash",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Transcribe textualmente lo que se dice en este audio en español, sin agregar introducciones ni explicaciones:"},
+                    {
+                        "type": "input_audio",
+                        "input_audio": {
+                            "data": audio_b64,
+                            "format": "ogg"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        res = json.loads(resp.read().decode("utf-8"))
+        return res["choices"][0]["message"]["content"].strip()
+
+def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_bytes=None):
+    """
+    Interpreta un reporte vía texto o con imagen adjunta usando GPT-4o-mini con visión.
     """
     if not api_key:
         raise ValueError("Se requiere API_OPEN_ROUTER")
 
-    user_msg = f"Mensaje del productor: \"{texto}\""
+    user_text = f"Mensaje del productor: \"{texto or 'Foto adjunta'}\""
     if cultivo_parcela:
-        user_msg += f"\nCultivo de la parcela: {cultivo_parcela}"
+        user_text += f"\nCultivo de la parcela: {cultivo_parcela}"
+
+    user_content = [{"type": "text", "text": user_text}]
+
+    # Si hay foto adjunta, se envía en base64 para análisis visual
+    if foto_bytes:
+        img_b64 = base64.b64encode(foto_bytes).decode("utf-8")
+        user_content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
+        })
 
     payload = {
         "model": "openai/gpt-4o-mini",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_msg}
+            {"role": "user", "content": user_content}
         ],
         "temperature": 0.0,
         "response_format": {"type": "json_object"}
@@ -66,7 +108,7 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None):
         }
     )
 
-    with urllib.request.urlopen(req, timeout=25) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         res_data = json.loads(resp.read().decode("utf-8"))
         content = res_data["choices"][0]["message"]["content"]
         parsed = json.loads(content)

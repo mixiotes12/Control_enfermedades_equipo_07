@@ -135,6 +135,10 @@ Procesa lenguaje natural con el modelo multimodal vía OpenRouter:
 - **Mapeo al Catálogo Oficial:** Asigna el ID exacto de entre las 10 plagas o `"desconocida"` sin alucinaciones.
 - **Detección de Seguimientos:** Identifica casos en curso sin abrir reportes duplicados (`es_seguimiento`).
 - **Extracción de Superficie Afectada:** Traduce expresiones coloquiales ("tres cuartas partes", "la mitad", "una de cada cuatro matas") a porcentaje numérico exacto (default 10%).
+- **Soporte Multimodal Completo:**
+  - **Fotos (`.jpg`):** Análisis visual directo con `openai/gpt-4o-mini` para identificar plagas sobre el follaje y hojas.
+  - **Notas de voz (`.ogg`):** Transcripción de audios en la nube usando el modelo omni `qwen/qwen3.8-omni-flash`.
+- **Pipeline de Validación:** `procesar_reportes.py` orquesta la descarga de archivos multimedia, consulta de catálogos y validación con `POST /casos/validar`.
 
 ## Llaves
 
