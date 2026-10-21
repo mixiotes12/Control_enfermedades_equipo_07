@@ -26,7 +26,7 @@ const supabase =
 // ESTADO CENTRAL DE LA APLICACIÓN
 // ============================================================================
 const estadoApp = {
-  vistaActual: "tecnico", // "tecnico" | "agricultor" | "bitacora"
+  vistaActual: "landing", // "landing" | "tecnico" | "agricultor" | "bitacora"
   plagas: datosSemilla.plagas || [],
   parcelas: datosSemilla.parcelas || [],
   tecnicos: datosSemilla.tecnicos || [],
@@ -368,19 +368,43 @@ mapAgricultor.on(L.Draw.Event.CREATED, (e) => {
 });
 
 // ============================================================================
-// CONMUTADOR DE VISTAS (TÉCNICO / AGRICULTOR / BITÁCORA)
+// CONMUTADOR DE VISTAS Y ENRUTAMIENTO SPA (LANDING / TÉCNICO / AGRICULTOR / BITÁCORA)
 // ============================================================================
-function cambiarVista(nuevaVista) {
+function resolverVistaDesdeUrl() {
+  const path = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  if (path.includes("agricultor") || hash.includes("agricultor")) return "agricultor";
+  if (
+    path.includes("coordinador") ||
+    path.includes("tecnico") ||
+    hash.includes("coordinador") ||
+    hash.includes("tecnico")
+  ) {
+    return "tecnico";
+  }
+  if (path.includes("bitacora") || hash.includes("bitacora")) return "bitacora";
+  return "landing";
+}
+
+function cambiarVista(nuevaVista, actualizarHistorial = true) {
   estadoApp.vistaActual = nuevaVista;
+
   document.querySelectorAll(".role-btn").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.vista === nuevaVista);
   });
 
   const vistas = {
+    landing: document.querySelector("#vista-landing"),
     tecnico: document.querySelector("#vista-tecnico"),
     agricultor: document.querySelector("#vista-agricultor"),
     bitacora: document.querySelector("#vista-bitacora"),
   };
+
+  const kpiRibbon = document.querySelector(".kpi-ribbon");
+  if (kpiRibbon) {
+    // Ocultar ribbon general en la landing (la landing tiene sus propios KPIs de pie)
+    kpiRibbon.classList.toggle("oculto", nuevaVista === "landing");
+  }
 
   Object.entries(vistas).forEach(([clave, el]) => {
     if (!el) return;
@@ -393,16 +417,231 @@ function cambiarVista(nuevaVista) {
     }
   });
 
+  if (actualizarHistorial) {
+    const rutas = {
+      landing: "/",
+      tecnico: "/coordinador",
+      agricultor: "/agricultor",
+      bitacora: "/bitacora",
+    };
+    const destino = rutas[nuevaVista] || "/";
+    if (window.location.pathname !== destino) {
+      history.pushState({ vista: nuevaVista }, "", destino);
+    }
+  }
+
+  // Desplazamiento suave al tope
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
   // Reajustar tamaño del lienzo Leaflet tras mostrar la pestaña
   setTimeout(() => {
-    if (nuevaVista === "tecnico") mapTecnico.invalidateSize();
-    if (nuevaVista === "agricultor") mapAgricultor.invalidateSize();
-  }, 100);
+    if (nuevaVista === "tecnico" && mapTecnico) mapTecnico.invalidateSize();
+    if (nuevaVista === "agricultor" && mapAgricultor) mapAgricultor.invalidateSize();
+  }, 120);
 }
+
+window.addEventListener("popstate", () => {
+  const vista = resolverVistaDesdeUrl();
+  cambiarVista(vista, false);
+});
 
 document.querySelectorAll(".role-btn").forEach((btn) => {
   btn.addEventListener("click", () => cambiarVista(btn.dataset.vista));
 });
+
+// Enlace Inicio en topbar y logo de cabecera
+document.querySelector("#btn-portal-selector")?.addEventListener("click", () => cambiarVista("landing"));
+document.querySelector("#brand-home")?.addEventListener("click", () => cambiarVista("landing"));
+
+// ============================================================================
+// GESTIÓN DE SESIONES Y AUTENTICACIÓN (PORTAL AGRICULTOR & CENTRO DE MANDO)
+// ============================================================================
+function guardarSesion(sesion) {
+  try {
+    localStorage.setItem("alerta_plaga_sesion", JSON.stringify(sesion));
+  } catch {}
+  actualizarBadgeSesion(sesion);
+}
+
+function cargarSesion() {
+  try {
+    const raw = localStorage.getItem("alerta_plaga_sesion");
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+function actualizarBadgeSesion(sesion) {
+  const badge = document.querySelector("#usuario-sesion-badge");
+  const icono = document.querySelector("#sesion-icono");
+  const nombre = document.querySelector("#sesion-nombre");
+  const rol = document.querySelector("#sesion-rol");
+
+  if (!badge) return;
+
+  if (!sesion) {
+    badge.classList.add("oculto");
+    return;
+  }
+
+  badge.classList.remove("oculto");
+  if (sesion.rol === "agricultor") {
+    badge.classList.remove("coordinador");
+    if (icono) icono.textContent = "👨‍🌾";
+    if (nombre) nombre.textContent = sesion.nombre || "Productor";
+    if (rol) rol.textContent = `Productor · ${sesion.id}`;
+  } else {
+    badge.classList.add("coordinador");
+    if (icono) icono.textContent = "🔬";
+    if (nombre) nombre.textContent = sesion.nombre || "Coordinador";
+    if (rol) rol.textContent = sesion.id === "todos" ? "Coordinación General" : `Técnico · ${sesion.id}`;
+  }
+}
+
+function aplicarSesion(sesion) {
+  if (!sesion) return;
+  actualizarBadgeSesion(sesion);
+  if (sesion.rol === "agricultor" && sesion.id) {
+    estadoApp.productorActualId = sesion.id;
+    if (selectProductorActivo) selectProductorActivo.value = sesion.id;
+    poblarSelectoresCatalogo();
+    const prod = mapaProductores.get(sesion.id);
+    const primeraParcela = prod?.parcelas?.[0];
+    if (primeraParcela) seleccionarParcelaAgricultor(primeraParcela);
+  } else if (sesion.rol === "coordinador" || sesion.rol === "tecnico") {
+    const tecId = sesion.id || "todos";
+    estadoApp.filtroTecnico = tecId;
+    const selTec = document.querySelector("#filtro-tecnico");
+    if (selTec) selTec.value = tecId;
+    filtrarCasosTecnico();
+  }
+}
+
+function poblarModalAuthAgricultor() {
+  const select = document.querySelector("#select-auth-productor");
+  if (!select || !estadoApp.productores.length) return;
+  select.innerHTML = "";
+  const ordenados = [...estadoApp.productores].sort((a, b) =>
+    a.id.localeCompare(b.id, undefined, { numeric: true })
+  );
+  for (const pr of ordenados) {
+    const opt = document.createElement("option");
+    opt.value = pr.id;
+    const cantParcelas = pr.parcelas ? pr.parcelas.length : 0;
+    opt.textContent = `${pr.id} · ${pr.nombre} (${pr.municipio} · ${cantParcelas} parcela${cantParcelas === 1 ? "" : "s"})`;
+    select.appendChild(opt);
+  }
+  if (estadoApp.productorActualId) {
+    select.value = estadoApp.productorActualId;
+  }
+}
+
+function abrirModalAuthAgricultor() {
+  poblarModalAuthAgricultor();
+  document.querySelector("#modal-auth-agricultor")?.classList.remove("oculto");
+}
+
+function cerrarModalAuthAgricultor() {
+  document.querySelector("#modal-auth-agricultor")?.classList.add("oculto");
+}
+
+function abrirModalAuthCoordinador() {
+  document.querySelector("#modal-auth-coordinador")?.classList.remove("oculto");
+}
+
+function cerrarModalAuthCoordinador() {
+  document.querySelector("#modal-auth-coordinador")?.classList.add("oculto");
+}
+
+function inicializarEventosAuth() {
+  // Botones de acceso en Landing Page
+  document.querySelector("#btn-entrar-agricultor")?.addEventListener("click", abrirModalAuthAgricultor);
+  document.querySelector("#btn-entrar-coordinador")?.addEventListener("click", abrirModalAuthCoordinador);
+
+  // Cerrar modales
+  document.querySelector("#btn-cerrar-auth-agri")?.addEventListener("click", cerrarModalAuthAgricultor);
+  document.querySelector("#btn-cerrar-auth-coord")?.addEventListener("click", cerrarModalAuthCoordinador);
+
+  // Cierre al hacer click en el backdrop
+  document.querySelector("#modal-auth-agricultor")?.addEventListener("click", (e) => {
+    if (e.target.id === "modal-auth-agricultor") cerrarModalAuthAgricultor();
+  });
+  document.querySelector("#modal-auth-coordinador")?.addEventListener("click", (e) => {
+    if (e.target.id === "modal-auth-coordinador") cerrarModalAuthCoordinador();
+  });
+
+  // Chips demo de agricultor
+  document.querySelectorAll(".chip-demo").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const pid = chip.dataset.pid;
+      const select = document.querySelector("#select-auth-productor");
+      if (select && pid) select.value = pid;
+    });
+  });
+
+  // Confirmar acceso Agricultor
+  document.querySelector("#btn-confirmar-auth-agri")?.addEventListener("click", () => {
+    const select = document.querySelector("#select-auth-productor");
+    const pid = select?.value || "PR-101";
+    const prod = mapaProductores.get(pid);
+    const sesion = {
+      rol: "agricultor",
+      id: pid,
+      nombre: prod?.nombre || `Productor ${pid}`,
+      municipio: prod?.municipio || "Texcoco",
+    };
+    guardarSesion(sesion);
+    aplicarSesion(sesion);
+    cerrarModalAuthAgricultor();
+    cambiarVista("agricultor");
+    mostrarToast(`🌾 Sesión iniciada: ${sesion.nombre} (${pid})`);
+  });
+
+  // Confirmar acceso Coordinador
+  const confirmarAuthCoord = () => {
+    const pin = (document.querySelector("#input-auth-pin")?.value || "").trim().toLowerCase();
+    const tecId = document.querySelector("#select-auth-tecnico")?.value || "todos";
+
+    // Validar PIN de acceso (preconfigurado 2026 o clave oficial de equipo)
+    if (pin && pin !== "2026" && pin !== "amaranto-cebada-44" && pin !== "admin") {
+      mostrarToast("⚠️ Clave/PIN incorrecto. Usa el PIN de demostración: 2026");
+      return;
+    }
+
+    let nombreRol = "Coordinador General";
+    if (tecId !== "todos") {
+      const tec = mapaTecnicos.get(tecId);
+      nombreRol = tec ? tec.nombre : tecId;
+    }
+
+    const sesion = {
+      rol: tecId === "todos" ? "coordinador" : "tecnico",
+      id: tecId,
+      nombre: nombreRol,
+    };
+    guardarSesion(sesion);
+    aplicarSesion(sesion);
+    cerrarModalAuthCoordinador();
+    cambiarVista("tecnico");
+    mostrarToast(`🔬 Acceso autorizado: ${nombreRol}`);
+  };
+
+  document.querySelector("#btn-confirmar-auth-coord")?.addEventListener("click", confirmarAuthCoord);
+  document.querySelector("#form-auth-coord")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    confirmarAuthCoord();
+  });
+
+  // Botón Cambiar Usuario en badge
+  document.querySelector("#btn-cambiar-sesion")?.addEventListener("click", () => {
+    const actual = cargarSesion();
+    if (actual?.rol === "agricultor") {
+      abrirModalAuthAgricultor();
+    } else {
+      abrirModalAuthCoordinador();
+    }
+  });
+}
 
 // ============================================================================
 // RENDERIZADO DE KPIS GLOBALES
@@ -423,6 +662,12 @@ function renderizarKPIs() {
 
   const elAvisos = document.querySelector("#kpi-avisos-total");
   if (elAvisos) elAvisos.textContent = `${estadoApp.avisos.length} avisos emitidos`;
+
+  // KPIs de la Landing Page
+  animarContador(document.querySelector("#land-kpi-casos"), casos.length);
+  animarContador(document.querySelector("#land-kpi-productores"), estadoApp.productores.length);
+  animarContador(document.querySelector("#land-kpi-parcelas"), estadoApp.parcelas.length);
+  animarContador(document.querySelector("#land-kpi-tecnicos"), estadoApp.tecnicos.length);
 }
 
 // ============================================================================
@@ -1780,6 +2025,8 @@ function iniciarPanel() {
   renderizarKPIs();
   actualizarVistaTecnico();
   renderizarFeedAvisosOficiales();
+  poblarModalAuthAgricultor();
+  inicializarEventosAuth();
 
   // Seleccionar una parcela inicial con caso interesante o la primera del productor
   seleccionarParcelaAgricultor("P-001");
@@ -1792,6 +2039,17 @@ function iniciarPanel() {
   if (bitCultivo) bitCultivo.value = "maíz";
 
   cargarBitacora();
+
+  // Restaurar sesión persistida si existe
+  const sesionGuardada = cargarSesion();
+  if (sesionGuardada) {
+    aplicarSesion(sesionGuardada);
+  }
+
+  // Determinar la vista inicial según la URL (o Landing por defecto)
+  const vistaInicial = resolverVistaDesdeUrl();
+  cambiarVista(vistaInicial, false);
+
   sincronizarDatosEnVivo(false);
 }
 

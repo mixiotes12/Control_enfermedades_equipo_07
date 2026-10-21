@@ -334,7 +334,7 @@ createServer(async (solicitud, respuesta) => {
     }
   }
 
-  // Archivos estáticos de dist/
+  // Archivos estáticos de dist/ y soporte SPA para rutas (/agricultor, /coordinador, /bitacora)
   const ruta = normalize(decodeURIComponent(pathname));
   const archivo = join(DIST, ruta === "/" ? "index.html" : ruta);
   try {
@@ -342,6 +342,14 @@ createServer(async (solicitud, respuesta) => {
     respuesta.writeHead(200, { "Content-Type": TIPOS[extname(archivo)] ?? "application/octet-stream" });
     respuesta.end(contenido);
   } catch {
+    // Si es una ruta de navegación web (SPA), servir index.html
+    if (!pathname.includes(".") || pathname.endsWith(".html")) {
+      try {
+        const contenidoIndex = await readFile(join(DIST, "index.html"));
+        respuesta.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        return respuesta.end(contenidoIndex);
+      } catch {}
+    }
     respuesta.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     respuesta.end("No encontrado.");
   }

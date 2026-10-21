@@ -1603,6 +1603,427 @@ tbody tr:hover {
   animation: fadeSlideUp 0.25s ease;
 }
 
+/* ============================================================================
+   ESTILOS: LANDING PAGE & SELECTOR DE PORTALES
+   ============================================================================ */
+.brand-area {
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.2s ease;
+}
+
+.brand-area:hover {
+  opacity: 0.9;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sesion-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.sesion-pill.coordinador {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+}
+
+.sesion-datos {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.sesion-datos strong {
+  font-size: 12px;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.sesion-datos small {
+  font-size: 10.5px;
+  color: var(--tenue);
+}
+
+.btn-cambiar-user {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--linea);
+  color: var(--texto-sec);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cambiar-user:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.btn-selector-portal {
+  background: rgba(30, 41, 59, 0.85);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.btn-selector-portal:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+}
+
+.landing-hero {
+  max-width: 1320px;
+  margin: 32px auto 60px;
+  padding: 0 24px;
+}
+
+.landing-content {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.landing-header {
+  text-align: center;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.landing-title {
+  font-size: clamp(28px, 4.2vw, 46px);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 16px 0 14px;
+  color: #ffffff;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #34d399 0%, #38bdf8 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.landing-sub {
+  font-size: clamp(14.5px, 1.3vw, 17px);
+  color: var(--texto-sec);
+  line-height: 1.6;
+  margin: 0 auto;
+  max-width: 720px;
+}
+
+.landing-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 28px;
+  margin-top: 12px;
+}
+
+.portal-card {
+  position: relative;
+  background: linear-gradient(160deg, rgba(19, 30, 50, 0.95), rgba(11, 18, 32, 0.96));
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 22px;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.portal-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.6);
+}
+
+.portal-card-agricultor:hover {
+  border-color: rgba(16, 185, 129, 0.6);
+}
+
+.portal-card-coordinador:hover {
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.portal-glow {
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(60px);
+  opacity: 0.18;
+}
+
+.portal-card-agricultor .portal-glow {
+  background: #10b981;
+}
+
+.portal-card-coordinador .portal-glow {
+  background: #38bdf8;
+}
+
+.portal-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #34d399;
+  margin-bottom: 20px;
+}
+
+.portal-badge.badge-admin {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+}
+
+.portal-icon {
+  font-size: 42px;
+  width: 74px;
+  height: 74px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--linea);
+  border-radius: 18px;
+  margin-bottom: 20px;
+}
+
+.portal-title {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 0 10px;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.portal-desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--texto-sec);
+  margin-bottom: 22px;
+}
+
+.portal-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  flex: 1;
+}
+
+.portal-features li {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 13.5px;
+  color: var(--texto);
+}
+
+.portal-features li span {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.btn-portal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 14px;
+  font-size: 14.5px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.btn-portal-agri {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+.btn-portal-agri:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.45);
+  transform: translateY(-2px);
+}
+
+.btn-portal-coord {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.3);
+}
+
+.btn-portal-coord:hover {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+  box-shadow: 0 10px 30px rgba(2, 132, 199, 0.45);
+  transform: translateY(-2px);
+}
+
+.btn-arrow {
+  font-size: 18px;
+  transition: transform 0.2s ease;
+}
+
+.btn-portal:hover .btn-arrow {
+  transform: translateX(5px);
+}
+
+.landing-footer-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+  background: rgba(13, 22, 39, 0.7);
+  border: 1px solid var(--linea);
+  border-radius: 18px;
+  padding: 22px 28px;
+  backdrop-filter: blur(10px);
+}
+
+.lkpi-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+
+.lkpi-val {
+  font-family: var(--mono);
+  font-size: 28px;
+  font-weight: 800;
+  color: #38bdf8;
+  letter-spacing: -0.02em;
+}
+
+.lkpi-lbl {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tenue);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Modales de Autenticación */
+.modal-auth-card {
+  max-width: 520px;
+  background: #0f1c30;
+  border: 1px solid var(--linea-fuerte);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+}
+
+.auth-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-hint {
+  font-size: 13.5px;
+  color: var(--texto-sec);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.auth-demo-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sub-hint {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tenue);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.chip-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chip-demo {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--linea);
+  color: var(--texto-sec);
+  font-size: 11.5px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip-demo:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #34d399;
+  transform: translateY(-1px);
+}
+
+.input-ayuda {
+  font-size: 11px;
+  color: var(--tenue);
+  margin-top: 5px;
+  display: block;
+}
+
+.input-ayuda code {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #38bdf8;
+  font-family: var(--mono);
+}
+
+.btn-admin {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+}
+
+.btn-admin:hover {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%) !important;
+}
+
+.pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(16, 185, 129, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.5); }
+}
+
 @media (max-width: 1180px) {
   .kpi-ribbon { grid-template-columns: repeat(2, 1fr); }
   .tecnico-top-grid,

@@ -21,7 +21,7 @@
   <!-- Encabezado Principal Sticky con Conmutador de Roles -->
   <header class="topbar">
     <div class="topbar-inner">
-      <div class="brand-area">
+      <div class="brand-area" id="brand-home" title="Volver a la página principal">
         <div class="brand-badges">
           <span class="badge-equipo">
             <span class="pulse-dot"></span>
@@ -32,9 +32,16 @@
         <h1 class="brand-title">Alerta Plaga <span class="brand-subtitle">Vigilancia Fitosanitaria & Control Geoespacial</span></h1>
       </div>
 
-      <!-- Conmutador de Vistas (Agricultor / Técnico / Bitácora) -->
+      <!-- Conmutador de Vistas (Inicio / Técnico / Agricultor / Bitácora) -->
       <nav class="role-switcher" aria-label="Cambiar vista del panel">
-        <button type="button" class="role-btn active" data-vista="tecnico" id="tab-tecnico">
+        <button type="button" class="role-btn active" data-vista="landing" id="tab-landing">
+          <span class="role-icon">🏛️</span>
+          <div class="role-text">
+            <span class="role-label">Inicio</span>
+            <span class="role-sub">Portales & Acceso</span>
+          </div>
+        </button>
+        <button type="button" class="role-btn" data-vista="tecnico" id="tab-tecnico">
           <span class="role-icon">🔬</span>
           <div class="role-text">
             <span class="role-label">Panel de Técnicos</span>
@@ -58,6 +65,21 @@
       </nav>
 
       <div class="topbar-actions">
+        <!-- User Badge & Sesión Activa -->
+        <div id="usuario-sesion-badge" class="sesion-pill oculto">
+          <span id="sesion-icono">👤</span>
+          <div class="sesion-datos">
+            <strong id="sesion-nombre">Fidel Jiménez</strong>
+            <small id="sesion-rol">Productor · PR-101</small>
+          </div>
+          <button type="button" id="btn-cambiar-sesion" class="btn-cambiar-user" title="Cambiar de usuario o salir">Cambiar</button>
+        </div>
+
+        <button type="button" id="btn-portal-selector" class="btn-icon-action btn-selector-portal" title="Volver a la selección de portales">
+          <span>🏛️</span>
+          <span>Inicio</span>
+        </button>
+
         <button type="button" id="btn-refrescar" class="btn-icon-action" title="Sincronizar con el Agente IA en vivo">
           <span class="sync-icon" id="icono-sync">🔄</span>
           <span id="texto-sync">En vivo</span>
@@ -66,8 +88,180 @@
     </div>
   </header>
 
-  <!-- Cinta de Métricas Globales (KPIs Animados) -->
-  <section class="kpi-ribbon" aria-label="Resumen ejecutivo en tiempo real">
+  <!-- ========================================================================
+       LANDING PAGE & SELECTOR DE PORTALES (VISTA PRINCIPAL /)
+       ======================================================================== -->
+  <section id="vista-landing" class="landing-hero vista-contenedor vista-activa">
+    <div class="landing-content">
+      <div class="landing-header">
+        <span class="badge-equipo pulse-glow">Junta Local de Sanidad Vegetal · Región Texcoco</span>
+        <h1 class="landing-title">Sistema de Vigilancia Fitosanitaria <span class="gradient-text">Alerta Plaga</span></h1>
+        <p class="landing-sub">
+          Plataforma tecnológica para la detección temprana de plagas, asignación de técnicos de campo y protección epidemiológica de cultivos con IA y georreferenciación.
+        </p>
+      </div>
+
+      <!-- Tarjetas de Acceso por Rol -->
+      <div class="landing-cards-grid">
+        <!-- Tarjeta 1: Portal del Agricultor -->
+        <div class="portal-card portal-card-agricultor" id="card-acceso-agricultor">
+          <div class="portal-glow" aria-hidden="true"></div>
+          <div class="portal-badge">Módulo de Campo · Productores</div>
+          <div class="portal-icon">👨‍🌾</div>
+          <h2 class="portal-title">Portal del Agricultor</h2>
+          <p class="portal-desc">
+            Consulta el estado fitosanitario de tus parcelas, activa tu <strong>Radar Epidemiológico de 5 km</strong> para vigilar plagas en parcelas vecinas y emite reportes o consultas directamente a tu bitácora.
+          </p>
+          <ul class="portal-features">
+            <li><span>🌱</span> Ficha de cultivo y etapa fenológica</li>
+            <li><span>📡</span> Radar de alertas en predios vecinos (&le;5 km)</li>
+            <li><span>📝</span> Simulador y reporte directo de plagas</li>
+            <li><span>📖</span> Bitácora persistente en Supabase</li>
+          </ul>
+          <button type="button" class="btn-portal btn-portal-agri" id="btn-entrar-agricultor">
+            <span>Ingresar como Productor</span>
+            <span class="btn-arrow">&rarr;</span>
+          </button>
+        </div>
+
+        <!-- Tarjeta 2: Centro de Mando Técnico & Coordinación -->
+        <div class="portal-card portal-card-coordinador" id="card-acceso-coordinador">
+          <div class="portal-glow" aria-hidden="true"></div>
+          <div class="portal-badge badge-admin">Centro de Mando · Autoridades</div>
+          <div class="portal-icon">🔬</div>
+          <h2 class="portal-title">Centro de Mando Técnico</h2>
+          <p class="portal-desc">
+            Panel táctico para el <strong>Coordinador y los 12 Técnicos Especialistas</strong>: mapa geoespacial regional, monitoreo de cargas operativas, anillos de brote activo, alertas cuarentenarias y avisos oficiales.
+          </p>
+          <ul class="portal-features">
+            <li><span>🗺️</span> Mapa geoespacial de 264 parcelas con Leaflet</li>
+            <li><span>👨‍🔬</span> Monitoreo y rutas de 12 técnicos de campo</li>
+            <li><span>🔥</span> Detección de cercos epidemiológicos (&ge;3 casos en 7d)</li>
+            <li><span>🚨</span> Semáforos prioritarios (24h, 48h, 72h) y Telegram</li>
+          </ul>
+          <button type="button" class="btn-portal btn-portal-coord" id="btn-entrar-coordinador">
+            <span>Acceso Coordinación Técnica</span>
+            <span class="btn-arrow">&rarr;</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Resumen en Vivo del Sistema -->
+      <div class="landing-footer-kpis">
+        <div class="lkpi-item">
+          <span class="lkpi-val" id="land-kpi-casos">116</span>
+          <span class="lkpi-lbl">Casos Fitosanitarios Atendidos</span>
+        </div>
+        <div class="lkpi-item">
+          <span class="lkpi-val" id="land-kpi-productores">191</span>
+          <span class="lkpi-lbl">Productores en Padrón</span>
+        </div>
+        <div class="lkpi-item">
+          <span class="lkpi-val" id="land-kpi-parcelas">264</span>
+          <span class="lkpi-lbl">Parcelas Bajo Cobertura</span>
+        </div>
+        <div class="lkpi-item">
+          <span class="lkpi-val" id="land-kpi-tecnicos">12</span>
+          <span class="lkpi-lbl">Técnicos Desplegados</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       MODAL DE AUTENTICACIÓN: PORTAL DEL AGRICULTOR
+       ======================================================================== -->
+  <div id="modal-auth-agricultor" class="modal-backdrop oculto" role="dialog" aria-modal="true">
+    <div class="modal-card modal-auth-card">
+      <div class="modal-header">
+        <div>
+          <span class="badge-equipo">ACCESO DE PRODUCTOR</span>
+          <h3>Iniciar Sesión en Portal Agricultor</h3>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-cerrar-auth-agri">&times;</button>
+      </div>
+      <div class="modal-body auth-body">
+        <p class="auth-hint">Selecciona tu clave de productor o escribe tu nombre para cargar automáticamente tus parcelas:</p>
+        
+        <div class="form-grupo">
+          <label for="select-auth-productor">Clave o Nombre del Productor:</label>
+          <select id="select-auth-productor" class="input-grande">
+            <!-- Se puebla dinámicamente con los 191 productores -->
+          </select>
+        </div>
+
+        <div class="auth-demo-chips">
+          <span class="sub-hint">Productores destacados:</span>
+          <div class="chip-container">
+            <button type="button" class="chip-demo" data-pid="PR-101">PR-101 · Fidel Jiménez (P-001)</button>
+            <button type="button" class="chip-demo" data-pid="PR-105">PR-105 · Jacinto Vázquez (P-005, P-006)</button>
+            <button type="button" class="chip-demo" data-pid="PR-168">PR-168 · Andrés Corona (P-094 Brote)</button>
+            <button type="button" class="chip-demo" data-pid="PR-165">PR-165 · Gonzalo Morales (P-089)</button>
+          </div>
+        </div>
+
+        <div class="auth-actions">
+          <button type="button" id="btn-confirmar-auth-agri" class="btn-primario btn-full">
+            <span>Acceder a Mis Parcelas</span>
+            <span>&rarr;</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL DE AUTENTICACIÓN: CENTRO DE MANDO TÉCNICO
+       ======================================================================== -->
+  <div id="modal-auth-coordinador" class="modal-backdrop oculto" role="dialog" aria-modal="true">
+    <div class="modal-card modal-auth-card">
+      <div class="modal-header">
+        <div>
+          <span class="badge-equipo badge-admin">ACCESO RESTRINGIDO</span>
+          <h3>Autenticación de Coordinación Técnica</h3>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-cerrar-auth-coord">&times;</button>
+      </div>
+      <div class="modal-body auth-body">
+        <p class="auth-hint">Ingresa con tu clave de acceso de la Junta Local o selecciona un rol técnico:</p>
+        
+        <form id="form-auth-coord" onsubmit="return false;">
+          <div class="form-grupo">
+            <label for="input-auth-pin">Clave de Acceso / PIN:</label>
+            <input type="password" id="input-auth-pin" class="input-grande" placeholder="Ingresa PIN (ej. 2026)" value="2026" autocomplete="current-password">
+            <span class="input-ayuda">PIN preconfigurado para jurados y equipo: <code>2026</code> o <code>amaranto-cebada-44</code></span>
+          </div>
+
+          <div class="form-grupo">
+            <label for="select-auth-tecnico">Filtrar directamente como Técnico:</label>
+            <select id="select-auth-tecnico" class="input-grande">
+              <option value="todos">⭐ Coordinador General (Todos los 12 técnicos)</option>
+              <option value="T-01">T-01 · Ing. Paola Cruz (Fitopatología)</option>
+              <option value="T-02">T-02 · Ing. Tomás Ruiz (Entomología)</option>
+              <option value="T-03">T-03 · Ing. Laura Méndez (Entomología)</option>
+              <option value="T-04">T-04 · Ing. Ricardo Salinas (Entomología)</option>
+              <option value="T-05">T-05 · Ing. Sofía Morales (Fitopatología)</option>
+              <option value="T-06">T-06 · Ing. Jorge Bautista (Entomología)</option>
+              <option value="T-07">T-07 · Ing. Mariana Flores (Fitopatología)</option>
+              <option value="T-08">T-08 · Ing. Carlos Delgado (Entomología)</option>
+              <option value="T-09">T-09 · Ing. Diana Herrera (Fitopatología)</option>
+              <option value="T-10">T-10 · Ing. Héctor Reyes (Entomología)</option>
+              <option value="T-11">T-11 · Ing. Gabriela Navarro (Entomología)</option>
+              <option value="T-12">T-12 · Ing. Roberto Peña (Fitopatología)</option>
+            </select>
+          </div>
+
+          <div class="auth-actions">
+            <button type="submit" id="btn-confirmar-auth-coord" class="btn-primario btn-admin btn-full">
+              <span>Ingresar al Centro de Mando</span>
+              <span>&rarr;</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <section class="kpi-ribbon oculto" aria-label="Resumen ejecutivo en tiempo real">
     <div class="kpi-card kpi-total">
       <div class="kpi-icon-wrap">📊</div>
       <div class="kpi-info">
@@ -116,7 +310,7 @@
   <!-- ========================================================================
        VISTA 1: CENTRO DE CONTROL TÉCNICO & COORDINACIÓN (NIVEL 2)
        ======================================================================== -->
-  <main id="vista-tecnico" class="vista-contenedor vista-activa">
+  <main id="vista-tecnico" class="vista-contenedor oculto">
     <!-- Banner contextual para técnicos -->
     <div class="section-banner banner-tecnico">
       <div class="banner-left">
