@@ -128,6 +128,14 @@ El proyecto incluye el motor de reglas determinista (`clasificador.py`) para el 
 python3 validar_clasificador.py
 ```
 
+## Módulo de Interpretación con Inteligencia Artificial (`interprete.py`)
+
+Procesa lenguaje natural con el modelo multimodal vía OpenRouter:
+- **Detección de Reporte:** Clasifica `es_plaga` (distingue trámites, dudas y saludos de reportes fitosanitarios).
+- **Mapeo al Catálogo Oficial:** Asigna el ID exacto de entre las 10 plagas o `"desconocida"` sin alucinaciones.
+- **Detección de Seguimientos:** Identifica casos en curso sin abrir reportes duplicados (`es_seguimiento`).
+- **Extracción de Superficie Afectada:** Traduce expresiones coloquiales ("tres cuartas partes", "la mitad", "una de cada cuatro matas") a porcentaje numérico exacto (default 10%).
+
 ## Llaves
 
 - `.env` contiene las llaves y no se sube al repositorio; está en `.gitignore`.
