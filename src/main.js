@@ -373,25 +373,42 @@ mapAgricultor.on(L.Draw.Event.CREATED, (e) => {
 function resolverVistaDesdeUrl() {
   const path = window.location.pathname.toLowerCase();
   const hash = window.location.hash.toLowerCase();
-  if (path.includes("agricultor") || hash.includes("agricultor")) return "agricultor";
+  const sesion = cargarSesion();
+
+  if (path.includes("agricultor") || hash.includes("agricultor")) {
+    if (!sesion || sesion.rol !== "agricultor") {
+      setTimeout(() => abrirModalAuthAgricultor(), 150);
+      return "landing";
+    }
+    return "agricultor";
+  }
+
   if (
     path.includes("coordinador") ||
     path.includes("tecnico") ||
     hash.includes("coordinador") ||
     hash.includes("tecnico")
   ) {
+    if (!sesion || (sesion.rol !== "coordinador" && sesion.rol !== "tecnico")) {
+      setTimeout(() => abrirModalAuthCoordinador(), 150);
+      return "landing";
+    }
     return "tecnico";
   }
-  if (path.includes("bitacora") || hash.includes("bitacora")) return "bitacora";
+
+  if (path.includes("bitacora") || hash.includes("bitacora")) {
+    if (!sesion || (sesion.rol !== "coordinador" && sesion.rol !== "tecnico")) {
+      setTimeout(() => abrirModalAuthCoordinador(), 150);
+      return "landing";
+    }
+    return "bitacora";
+  }
+
   return "landing";
 }
 
 function cambiarVista(nuevaVista, actualizarHistorial = true) {
   estadoApp.vistaActual = nuevaVista;
-
-  document.querySelectorAll(".role-btn").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.vista === nuevaVista);
-  });
 
   const vistas = {
     landing: document.querySelector("#vista-landing"),
@@ -404,6 +421,20 @@ function cambiarVista(nuevaVista, actualizarHistorial = true) {
   if (kpiRibbon) {
     // Ocultar ribbon general en la landing (la landing tiene sus propios KPIs de pie)
     kpiRibbon.classList.toggle("oculto", nuevaVista === "landing");
+  }
+
+  // Control de navegación interna de coordinación en cabecera
+  const navCoord = document.querySelector("#nav-coordinador");
+  if (navCoord) {
+    const sesion = cargarSesion();
+    const esCoord = sesion && (sesion.rol === "coordinador" || sesion.rol === "tecnico");
+    if (esCoord && (nuevaVista === "tecnico" || nuevaVista === "bitacora")) {
+      navCoord.classList.remove("oculto");
+      document.querySelector("#btn-subnav-mando")?.classList.toggle("active", nuevaVista === "tecnico");
+      document.querySelector("#btn-subnav-bitacora")?.classList.toggle("active", nuevaVista === "bitacora");
+    } else {
+      navCoord.classList.add("oculto");
+    }
   }
 
   Object.entries(vistas).forEach(([clave, el]) => {
@@ -445,13 +476,17 @@ window.addEventListener("popstate", () => {
   cambiarVista(vista, false);
 });
 
-document.querySelectorAll(".role-btn").forEach((btn) => {
-  btn.addEventListener("click", () => cambiarVista(btn.dataset.vista));
+// Brand/Logo vuelve al inicio si no hay sesión
+document.querySelector("#brand-home")?.addEventListener("click", () => {
+  const sesion = cargarSesion();
+  if (!sesion) {
+    cambiarVista("landing");
+  }
 });
 
-// Enlace Inicio en topbar y logo de cabecera
-document.querySelector("#btn-portal-selector")?.addEventListener("click", () => cambiarVista("landing"));
-document.querySelector("#brand-home")?.addEventListener("click", () => cambiarVista("landing"));
+// Subnavegación exclusiva del Coordinador (Centro de Mando <-> Bitácora)
+document.querySelector("#btn-subnav-mando")?.addEventListener("click", () => cambiarVista("tecnico"));
+document.querySelector("#btn-subnav-bitacora")?.addEventListener("click", () => cambiarVista("bitacora"));
 
 // ============================================================================
 // GESTIÓN DE SESIONES Y AUTENTICACIÓN (PORTAL AGRICULTOR & CENTRO DE MANDO)
@@ -632,14 +667,15 @@ function inicializarEventosAuth() {
     confirmarAuthCoord();
   });
 
-  // Botón Cambiar Usuario en badge
-  document.querySelector("#btn-cambiar-sesion")?.addEventListener("click", () => {
-    const actual = cargarSesion();
-    if (actual?.rol === "agricultor") {
-      abrirModalAuthAgricultor();
-    } else {
-      abrirModalAuthCoordinador();
-    }
+  // Botón Salir / Cerrar Sesión en badge
+  document.querySelector("#btn-cerrar-sesion")?.addEventListener("click", () => {
+    try {
+      localStorage.removeItem("alerta_plaga_sesion");
+    } catch {}
+    actualizarBadgeSesion(null);
+    document.querySelector("#nav-coordinador")?.classList.add("oculto");
+    cambiarVista("landing");
+    mostrarToast("🚪 Sesión cerrada correctamente");
   });
 }
 

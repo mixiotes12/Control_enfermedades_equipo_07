@@ -32,53 +32,31 @@
         <h1 class="brand-title">Alerta Plaga <span class="brand-subtitle">Vigilancia Fitosanitaria & Control Geoespacial</span></h1>
       </div>
 
-      <!-- Conmutador de Vistas (Inicio / Técnico / Agricultor / Bitácora) -->
-      <nav class="role-switcher" aria-label="Cambiar vista del panel">
-        <button type="button" class="role-btn active" data-vista="landing" id="tab-landing">
-          <span class="role-icon">🏛️</span>
-          <div class="role-text">
-            <span class="role-label">Inicio</span>
-            <span class="role-sub">Portales & Acceso</span>
-          </div>
+      <!-- Navegación interna exclusiva para Coordinador Técnico (solo visible al autenticar rol de coordinación) -->
+      <nav id="nav-coordinador" class="coord-nav-tabs oculto" aria-label="Submódulos de Coordinación">
+        <button type="button" class="btn-subnav active" id="btn-subnav-mando">
+          <span>🔬</span>
+          <span>Centro de Mando</span>
         </button>
-        <button type="button" class="role-btn" data-vista="tecnico" id="tab-tecnico">
-          <span class="role-icon">🔬</span>
-          <div class="role-text">
-            <span class="role-label">Panel de Técnicos</span>
-            <span class="role-sub">Casos Nivel 2, Brotes y Rutas</span>
-          </div>
-        </button>
-        <button type="button" class="role-btn" data-vista="agricultor" id="tab-agricultor">
-          <span class="role-icon">👨‍🌾</span>
-          <div class="role-text">
-            <span class="role-label">Portal Agricultor</span>
-            <span class="role-sub">Mi Parcela, Radar 5km y Reporte</span>
-          </div>
-        </button>
-        <button type="button" class="role-btn" data-vista="bitacora" id="tab-bitacora">
-          <span class="role-icon">📓</span>
-          <div class="role-text">
-            <span class="role-label">Bitácora & Avisos</span>
-            <span class="role-sub">Supabase y Buzón Oficial</span>
-          </div>
+        <button type="button" class="btn-subnav" id="btn-subnav-bitacora">
+          <span>📓</span>
+          <span>Bitácora & Avisos</span>
         </button>
       </nav>
 
       <div class="topbar-actions">
-        <!-- User Badge & Sesión Activa -->
+        <!-- Badge de Usuario Autenticado & Botón de Salir -->
         <div id="usuario-sesion-badge" class="sesion-pill oculto">
           <span id="sesion-icono">👤</span>
           <div class="sesion-datos">
             <strong id="sesion-nombre">Fidel Jiménez</strong>
             <small id="sesion-rol">Productor · PR-101</small>
           </div>
-          <button type="button" id="btn-cambiar-sesion" class="btn-cambiar-user" title="Cambiar de usuario o salir">Cambiar</button>
+          <button type="button" id="btn-cerrar-sesion" class="btn-cerrar-sesion" title="Cerrar sesión y volver al inicio">
+            <span>🚪</span>
+            <span>Salir</span>
+          </button>
         </div>
-
-        <button type="button" id="btn-portal-selector" class="btn-icon-action btn-selector-portal" title="Volver a la selección de portales">
-          <span>🏛️</span>
-          <span>Inicio</span>
-        </button>
 
         <button type="button" id="btn-refrescar" class="btn-icon-action" title="Sincronizar con el Agente IA en vivo">
           <span class="sync-icon" id="icono-sync">🔄</span>
