@@ -3,6 +3,20 @@ import urllib.request
 import base64
 import re
 
+# Mapeo oficial de cultivos afectados por plaga según catálogo Sección 7
+CULTIVOS_POR_PLAGA = {
+    "gusano_cogollero": ["maíz"],
+    "roya_frijol": ["frijol"],
+    "pulgon": ["avena", "trigo", "maíz", "haba"],
+    "gallina_ciega": ["maíz", "frijol", "avena", "haba"],
+    "tizon_tardio": ["papa", "jitomate"],
+    "mosquita_blanca": ["jitomate", "frijol"],
+    "chapulin": ["maíz", "frijol", "haba", "avena"],
+    "mancha_chocolate": ["haba"],
+    "hlb": ["limón"],
+    "gorgojo_khapra": ["grano almacenado"],
+}
+
 # Menciones a SU reporte/visita previa: seguimiento aunque el modelo lo haya descartado.
 SEGUIMIENTO_RE = re.compile(
     r"\b(mi|mis)\s+(reporte|reportes|aviso|avisos|visita)\b|\blo de ayer\b|\bsigue igual\b",
@@ -22,22 +36,40 @@ CATALOGO_PLAGAS = """
 10. ID: "gorgojo_khapra" (Grano almacenado). Nombres locales: gorgojo khapra, gusanito peludo del grano. Síntomas: larvas peludas café claro en grano almacenado, pellejos en costales, granos huecos y polvo.
 """
 
-SYSTEM_PROMPT = f"""Eres un clasificador experto de sanidad vegetal de la Junta Local de Texcoco.
-Analizas mensajes enviados por agricultores (texto, audio transcrito o fotos con descripción) y decides:
+SYSTEM_PROMPT = f"""Eres un clasificador fitosanitario experto de la Junta Local de Sanidad Vegetal.
+Analizas mensajes enviados por agricultores (texto libre, audio transcrito de voz o fotos con descripción) y decides con rigor técnico y comprensión semántica completa.
+
+REGLA CRÍTICA DE ANÁLISIS:
+- LEE TODA LA ORACIÓN Y EL MENSAJE COMPLETO. NUNCA te bases en una o dos palabras aisladas.
+- RESTRICCIÓN BIOLÓGICA Y CULTIVO DE LA PARCELA:
+  Cada plaga tiene huéspedes vegetales específicos. Un cultivo NO puede tener plagas que no lo atacan:
+  * PAPA: En el catálogo oficial, la ÚNICA plaga que ataca la papa es "tizon_tardio" (Phytophthora infestans). "Algodoncito blanco", "pelusilla blanca", "moho blanco", "manchas oscuras", "debajo de la hoja" o "en el envés" en PAPA es la esporulación característica de "tizon_tardio". JAMÁS asignes "mosquita_blanca" a la papa, porque la mosquita blanca solo ataca jitomate y frijol.
+  * JITOMATE: Únicamente puede ser "tizon_tardio" o "mosquita_blanca".
+  * LIMÓN: Únicamente puede ser "hlb" (dragón amarillo).
+  * HABA: Únicamente "mancha_chocolate", "pulgon", "gallina_ciega" o "chapulin".
+  * FRIJOL: Únicamente "roya_frijol", "mosquita_blanca", "gallina_ciega" o "chapulin". Polvo color óxido en dedos es "roya_frijol".
+  * MAÍZ: Únicamente "gusano_cogollero", "pulgon", "gallina_ciega" o "chapulin".
+  * TRIGO: Únicamente "pulgon".
+  * AVENA: Únicamente "pulgon", "gallina_ciega" o "chapulin".
+  * GRANO ALMACENADO: Únicamente "gorgojo_khapra".
 
 1. "es_plaga": true para cualquier reporte sobre plagas o enfermedades en cultivos, INCLUYENDO seguimientos de casos previos: cualquier mensaje que se refiera a un reporte o visita que el productor ya hizo ("¿ya vienen a revisar lo de ayer?", "sigue igual", "¿qué pasó con mi reporte?", "nomás para confirmar que les llegó mi reporte", "¿ya mandaron al técnico?").
    false ÚNICAMENTE si son mensajes de trámites de fertilizante, horarios de oficina, pedidos o paquetes ajenos (postales, etc.), pláticas, agradecimientos o saludos aislados SIN referencia a un reporte, bromas o temas ajenos a la sanidad vegetal.
    Preguntar o avisar sobre SU reporte, aviso o visita ("confirmar que les llegó mi reporte", "¿ya mandaron al técnico?", "¿vienen hoy?") es un seguimiento: es_plaga=true, es_seguimiento=true, plaga="desconocida", aunque no describa síntomas.
    En cambio, algo que "llegó" SIN relación con su reporte (postales, paquetes, apoyos, fertilizante) NO es reporte.
    Si el productor dice que su cultivo "amaneció mal", está enfermo, dañado o raro aunque NO sepa qué tiene ("no sé qué tiene"), ES un reporte: es_plaga=true con plaga="desconocida". Nunca lo descartes como no-plaga por ser vago.
+
 2. "es_seguimiento": true ÚNICAMENTE si el mensaje NO describe síntomas nuevos y solo pregunta por un reporte o visita anterior ("¿ya vienen a revisar lo de ayer?", "¿cuándo van a venir a ver el gusano?", "sigue igual que ayer").
    false si el mensaje describe síntomas, daños observados, porcentaje o solicita atención para una infestación ("trae piojillo", "se están comiendo las hojas", "las hojas tienen manchas", "amaneció mal"). Preguntar al final "¿cuándo pueden venir a verlo?", "espero su ayuda" o "quedo al pendiente" tras describir un daño NO es seguimiento, es un reporte nuevo.
+
 3. "plaga": El id exacto de la plaga del catálogo:
 {CATALOGO_PLAGAS}
+   - Verifica SIEMPRE que la plaga sea biológicamente compatible con el cultivo de la parcela.
    - Si es un seguimiento que no menciona la plaga, o si los síntomas no coinciden con ninguna del catálogo, usa "desconocida". NUNCA inventes nombres.
    - Si es_plaga es false, usa null.
+
 4. "pct": Porcentaje de parcela afectada (0 a 100).
-   - Extraer de frases: "la mitad" -> 50, "un cuarto" o "una de cada cuatro" -> 25, "tres cuartas partes" -> 75, "una quinta parte" o "una de cada cinco" -> 20, "una décima parte" o "una de cada diez" -> 10, "una tercera parte" -> 33, "dos terceras partes" -> 67, "toda la parcela" -> 100, "como el 30%" -> 30. Convierte la fracción exacta, sin redondear a otra.
+   - Extraer de frases: "la mitad" -> 50, "un cuarto" o "una de cada cuatro" -> 25, "tres cuartas partes" -> 75, "una quinta parte" o "una de cada cinco" -> 20, "una décima parte" o "una de cada diez" -> 10, "una tercera parte" -> 33, "dos terceras partes" -> 67, "toda la parcela" -> 100, "como el 30%" -> 30, "75 %" -> 75. Convierte la fracción o porcentaje exacto.
    - Si no lo menciona o no se deduce, devuelve 10 (valor por defecto según las reglas).
    - Si es_plaga es false, usa null.
 
@@ -106,8 +138,8 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
             "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}
         })
 
-    # Las fotos requieren un modelo de visión más fuerte; texto y voz transcrita van con el mini (más rápido).
-    modelo = "openai/gpt-4o" if foto_bytes else "openai/gpt-4o-mini"
+    # Siempre usar el modelo insignia gpt-4o para comprensión y lectura semántica completa de la oración
+    modelo = "openai/gpt-4o"
 
     payload = {
         "model": modelo,
@@ -146,5 +178,19 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
         # Con baja confianza es mejor "desconocida" (0 puntos) que arriesgar plaga, semáforo y técnico (hasta -3).
         if parsed.get("es_plaga") and parsed.get("confianza") == "baja" and parsed.get("plaga") not in (None, "desconocida"):
             parsed["plaga"] = "desconocida"
+
+        # Verificación de compatibilidad biológica cultivo-plaga (salvo que sea foto con plaga visible)
+        cultivo_val = cultivo_parcela.get("cultivo", "") if isinstance(cultivo_parcela, dict) else str(cultivo_parcela or "")
+        cultivo_norm = cultivo_val.strip().lower()
+        plaga_asignada = parsed.get("plaga")
+        if parsed.get("es_plaga") and plaga_asignada and plaga_asignada != "desconocida" and cultivo_norm:
+            cultivos_validos = CULTIVOS_POR_PLAGA.get(plaga_asignada, [])
+            if cultivo_norm not in cultivos_validos and not foto_bytes:
+                plagas_candidatas = [p for p, c_list in CULTIVOS_POR_PLAGA.items() if cultivo_norm in c_list]
+                if len(plagas_candidatas) == 1:
+                    parsed["plaga"] = plagas_candidatas[0]
+                    parsed["razon"] = f"Ajuste por restricción biológica de cultivo {cultivo_norm}: {plagas_candidatas[0]}"
+                else:
+                    parsed["plaga"] = "desconocida"
 
         return parsed
