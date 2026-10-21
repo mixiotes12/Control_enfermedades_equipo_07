@@ -5,3 +5,4 @@ dist/
 __pycache__/
 *.pyc
 bitacora_servidor.json
+preguntas_activas.json

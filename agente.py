@@ -35,13 +35,16 @@ from clasificador import (
 )
 from interprete import interpretar_mensaje_texto, transcribir_audio
 
-INTERVALO = 20      # segundos entre consultas a /reportes
+INTERVALO = 8       # segundos entre consultas a /reportes
 HILOS = 6           # reportes procesados en paralelo
 MAX_INTENTOS = 4    # intentos por reporte antes de darlo por fallido
 TIMEOUT_PREGUNTA_S = 300  # segundos a esperar respuesta del productor antes de registrar como desconocido
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RUTA_HISTORIAL = os.path.join(AQUI, "casos_historial.json")
-HISTORIAL_LOCK = threading.Lock()
+RUTA_HISTORIAL_BACKUP = os.path.expanduser("~/casos_historial_backup.json")
+RUTA_PREGUNTAS = os.path.join(AQUI, "preguntas_activas.json")
+HISTORIAL_LOCK = threading.RLock()
+PREGUNTAS_LOCK = threading.RLock()
 
 
 def log(*partes):
@@ -126,32 +129,58 @@ def cargar_historial_base():
     except Exception as e:
         log(f"Aviso: no se pudo cargar /casos-previos: {e}")
 
-    if os.path.exists(RUTA_HISTORIAL):
-        try:
-            with open(RUTA_HISTORIAL, encoding="utf-8") as f:
-                for c in json.load(f):
-                    rid = c.get("reporte_id")
-                    if rid:
-                        por_id[rid] = c
-        except Exception as e:
-            log(f"Aviso: no se pudo leer {RUTA_HISTORIAL}: {e}")
+    for ruta_h in (RUTA_HISTORIAL, RUTA_HISTORIAL_BACKUP):
+        if os.path.exists(ruta_h):
+            try:
+                with open(ruta_h, encoding="utf-8") as f:
+                    for c in json.load(f):
+                        rid = c.get("reporte_id")
+                        if rid:
+                            por_id[rid] = c
+            except Exception as e:
+                log(f"Aviso: no se pudo leer {ruta_h}: {e}")
     return por_id
 
 
-def guardar_caso_historial(historial_por_id, caso):
+def guardar_caso_historial(historial_por_id, caso, persistir=True):
     """Guarda un caso nuevo en memoria y en casos_historial.json de forma segura entre hilos."""
     with HISTORIAL_LOCK:
         historial_por_id[caso["reporte_id"]] = caso
+        if not persistir:
+            return
+        nuevos = [
+            c for rid, c in sorted(historial_por_id.items())
+            if str(rid).startswith("R-2")
+        ]
+        for ruta_h in (RUTA_HISTORIAL, RUTA_HISTORIAL_BACKUP):
+            try:
+                with open(ruta_h, "w", encoding="utf-8") as f:
+                    json.dump(nuevos, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                log(f"Aviso: no se pudo guardar {ruta_h}: {e}")
+
+
+def cargar_preguntas_activas():
+    """Carga el registro de preguntas activas desde preguntas_activas.json."""
+    if os.path.exists(RUTA_PREGUNTAS):
         try:
-            # Persistir todos los casos nuevos (R-2xxx) en casos_historial.json
-            nuevos = [
-                c for rid, c in sorted(historial_por_id.items())
-                if str(rid).startswith("R-2")
-            ]
-            with open(RUTA_HISTORIAL, "w", encoding="utf-8") as f:
-                json.dump(nuevos, f, ensure_ascii=False, indent=2)
+            with open(RUTA_PREGUNTAS, encoding="utf-8") as f:
+                datos = json.load(f)
+                if isinstance(datos, dict):
+                    return {str(k): float(v) for k, v in datos.items()}
         except Exception as e:
-            log(f"Aviso: no se pudo guardar {RUTA_HISTORIAL}: {e}")
+            log(f"Aviso: no se pudo leer {RUTA_PREGUNTAS}: {e}")
+    return {}
+
+
+def guardar_preguntas_activas(preguntas_activas):
+    """Persiste preguntas_activas en preguntas_activas.json de forma segura entre hilos."""
+    with PREGUNTAS_LOCK:
+        try:
+            with open(RUTA_PREGUNTAS, "w", encoding="utf-8") as f:
+                json.dump(preguntas_activas, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            log(f"Aviso: no se pudo guardar {RUTA_PREGUNTAS}: {e}")
 
 
 def ya_registrado(rep_id):
@@ -161,26 +190,47 @@ def ya_registrado(rep_id):
 
 
 def enviar_pregunta(rep_id, texto):
-    """Envía una pregunta al productor sobre un reporte que carece de datos."""
+    """Envía una pregunta al productor sobre un reporte que carece de datos.
+    Devuelve 'enviada', 'ya_enviada' o 'error'."""
     try:
         res = api("POST", "/preguntas", {"reporte_id": rep_id, "texto": texto})
         log(f"Pregunta enviada para {rep_id}: \"{texto}\" -> {res.get('mensaje')}")
-        return True
+        return "enviada"
     except Exception as e:
+        msg = str(e).lower()
         log(f"Error enviando pregunta para {rep_id}: {e}")
-        return False
+        if (
+            "http 400" in msg
+            or "http 409" in msg
+            or "ya" in msg
+            or "pregunta" in msg
+            or "existe" in msg
+            or "duplicad" in msg
+        ):
+            return "ya_enviada"
+        return "error"
 
 
-def tg_api(metodo, datos=None):
-    """Llama a la API de Telegram Bot."""
+def tg_api(metodo, datos=None, timeout=4):
+    """Llama a la API de Telegram Bot con timeout corto y reintento sin parse_mode en HTTP 400."""
     if not TELEGRAM_TOKEN:
         return None
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{metodo}"
     cuerpo = json.dumps(datos).encode("utf-8") if datos is not None else None
     req = urllib.request.Request(url, data=cuerpo, method="POST" if datos else "GET",
                                  headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=15) as r:
-        return json.loads(r.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 400 and metodo == "sendMessage" and isinstance(datos, dict) and "parse_mode" in datos:
+            datos_plano = {k: v for k, v in datos.items() if k != "parse_mode"}
+            cuerpo_plano = json.dumps(datos_plano).encode("utf-8")
+            req_plano = urllib.request.Request(url, data=cuerpo_plano, method="POST",
+                                               headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(req_plano, timeout=timeout) as r:
+                return json.loads(r.read().decode("utf-8"))
+        raise
 
 
 def guardar_chat_id(chat_id):
@@ -391,20 +441,26 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
     rep_id = rep["id"]
     parcela_id = rep.get("parcela_id")
 
-    # Si hay una respuesta del productor para este reporte, integrar su texto
+    # Si hay una respuesta del productor para este reporte, integrar su texto (o transcripción de voz)
     texto_adicional = ""
+    foto = None
     if respuestas_map and rep_id in respuestas_map:
         rep_resp = respuestas_map[rep_id]
-        texto_adicional = f"\nRespuesta posterior del productor: \"{rep_resp.get('texto') or ''}\""
+        resp_txt = (rep_resp.get("texto") or "").strip()
+        if not resp_txt and rep_resp.get("audio_url"):
+            resp_txt = (transcribir_audio(descargar(rep_resp["audio_url"]), API_KEY) or "").strip()
+        if resp_txt:
+            texto_adicional = f"\nRespuesta posterior del productor: \"{resp_txt}\""
         if not parcela_id and rep_resp.get("parcela_id"):
             parcela_id = rep_resp["parcela_id"]
+        if rep_resp.get("foto_url") and not rep.get("foto_url"):
+            foto = descargar(rep_resp["foto_url"])
 
     parcela = parcelas.get(parcela_id or "")
     cultivo = parcela["cultivo"] if parcela else None
     texto = (rep.get("texto") or "") + texto_adicional
     if not texto.strip():
         texto = None
-    foto = None
 
     if rep.get("tipo") == "voz" and rep.get("audio_url"):
         texto = transcribir_audio(descargar(rep["audio_url"]), API_KEY)
@@ -420,9 +476,12 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
 
     plaga_id = ia.get("plaga") or "desconocida"
     plaga = plagas.get(plaga_id)
+    if plaga is None:
+        plaga_id = "desconocida"
+        ia["plaga"] = "desconocida"
 
     # Si falta información clave (parcela desconocida o plaga desconocida en reporte nuevo),
-    # señalizar 'necesita_aclaracion' para enviar pregunta antes de registrar
+    # señalizar 'necesita_pregunta' para enviar pregunta antes de registrar
     necesita_pregunta = (
         not ia.get("es_seguimiento")
         and (parcela is None or plaga_id == "desconocida")
@@ -431,7 +490,7 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
 
     # Seguimiento, plaga no identificada o parcela desconocida: no abre caso (sin semáforo ni técnico).
     if ia.get("es_seguimiento") or plaga is None or parcela is None:
-        return {"reporte_id": rep_id, "es_plaga": True, "plaga": plaga_id if plaga else "desconocida"}, ia
+        return {"reporte_id": rep_id, "es_plaga": True, "plaga": "desconocida" if plaga is None else plaga_id}, ia
 
     pct = ia.get("pct")
     prioridad, semaforo = calcular_prioridad_y_semaforo(plaga, parcela, 10 if pct is None else pct)
@@ -442,7 +501,7 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
             c for rid, c in (historial_por_id or {}).items()
             if rid != rep_id
         ]
-    brote = calcular_brote(casos_previos, plaga_id, parcela["lat"], parcela["lon"], rep["recibido"])
+        brote = calcular_brote(casos_previos, plaga_id, parcela["lat"], parcela["lon"], rep["recibido"])
     ia["parcela_resuelta"] = parcela
     return {
         "reporte_id": rep_id,
@@ -455,71 +514,135 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
     }, ia
 
 
-def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id):
-    """Procesa un reporte. Devuelve (estado, detalle): 'ok', 'omitido', 'esperando_respuesta' o lanza excepción."""
+def preparar_reporte(rep, plagas, parcelas, preguntas_activas, respuestas_map, historial_por_id):
+    """Fase paralela: verifica si ya está registrado, si espera respuesta o interpreta con IA."""
     rep_id = rep["id"]
     if ya_registrado(rep_id):
-        preguntas_activas.pop(rep_id, None)
-        return "omitido", None
+        return "omitido", None, None
 
-    # Si ya hay una pregunta activa para este reporte y aún no hay respuesta, verificar timeout
     ahora = time.time()
-    if rep_id in preguntas_activas and rep_id not in respuestas_map:
-        t_pregunta = preguntas_activas[rep_id]
+    with PREGUNTAS_LOCK:
+        t_pregunta = preguntas_activas.get(rep_id)
+    if t_pregunta is not None and rep_id not in respuestas_map:
         if ahora - t_pregunta < TIMEOUT_PREGUNTA_S:
-            return "esperando_respuesta", None
+            return "esperando_respuesta", None, None
         else:
             log(f"{rep_id}: Se agotó el tiempo de espera ({TIMEOUT_PREGUNTA_S}s) de respuesta del productor. Registrando...")
 
     payload, ia = armar_payload(rep, plagas, parcelas, respuestas_map, historial_por_id)
+    return "listo", payload, ia
+
+
+def finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id):
+    """Fase secuencial/atómica: envía pregunta o calcula brote + POST /casos + historial en orden cronológico."""
+    rep_id = rep["id"]
+    estado_prep, payload, ia = prep
+
+    if estado_prep == "omitido":
+        with PREGUNTAS_LOCK:
+            if rep_id in preguntas_activas:
+                preguntas_activas.pop(rep_id, None)
+                guardar_preguntas_activas(preguntas_activas)
+        return "omitido", None
+
+    if estado_prep == "esperando_respuesta":
+        return "esperando_respuesta", None
+
+    ahora = time.time()
+    with PREGUNTAS_LOCK:
+        ya_preguntado = rep_id in preguntas_activas
 
     # Si necesita aclaración y todavía no le hemos preguntado ni respondido:
-    if ia.get("necesita_pregunta") and rep_id not in preguntas_activas and rep_id not in respuestas_map:
-        pregunta_txt = "¿Podría indicarnos en cuál de sus parcelas está el problema o qué síntomas observa con más detalle?"
-        if not rep.get("parcela_id"):
+    if not prueba and ia.get("necesita_pregunta") and not ya_preguntado and rep_id not in respuestas_map:
+        falta_parcela = not rep.get("parcela_id") or parcelas.get(rep.get("parcela_id") or "") is None
+        falta_plaga = (ia.get("plaga") or "desconocida") == "desconocida"
+        if falta_parcela and falta_plaga:
+            pregunta_txt = "¿En cuál de sus parcelas se ubica el cultivo afectado y qué síntomas específicos observa en las hojas, cogollo, fruto o raíz?"
+        elif falta_parcela:
             pregunta_txt = "¿En cuál de sus parcelas se ubica este cultivo afectado?"
-        elif ia.get("plaga") == "desconocida":
+        else:
             pregunta_txt = "¿Qué síntomas específicos observa en las hojas, cogollo, fruto o raíz?"
 
-        enviado = enviar_pregunta(rep_id, pregunta_txt)
-        if enviado:
-            preguntas_activas[rep_id] = ahora
+        estado_preg = enviar_pregunta(rep_id, pregunta_txt)
+        if estado_preg in ("enviada", "ya_enviada"):
+            with PREGUNTAS_LOCK:
+                preguntas_activas[rep_id] = ahora
+                guardar_preguntas_activas(preguntas_activas)
             return "esperando_respuesta", None
 
-    if prueba:
-        res = api("POST", "/casos/validar", payload)
-        return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
-    res = api("POST", "/casos", payload)
-    preguntas_activas.pop(rep_id, None)
-
-    # Si abrió un caso nuevo (tiene semáforo y parcela resuelta), guardarlo en el historial y emitir avisos
     parcela_res = ia.get("parcela_resuelta")
-    if payload.get("es_plaga") and "semaforo" in payload and parcela_res:
-        guardar_caso_historial(historial_por_id, {
-            "reporte_id": rep_id,
-            "parcela_id": parcela_res["id"],
-            "lat": parcela_res["lat"],
-            "lon": parcela_res["lon"],
-            "plaga": payload["plaga"],
-            "recibido": rep["recibido"],
-            "semaforo": payload.get("semaforo"),
-            "prioridad": payload.get("prioridad"),
-            "tecnico_id": payload.get("tecnico_id"),
-            "brote": payload.get("brote"),
-        })
+    abre_caso = bool(payload.get("es_plaga") and "semaforo" in payload and parcela_res)
+
+    # Cálculo de brote + POST /casos + registro en historial_por_id de forma atómica y secuencial
+    with HISTORIAL_LOCK:
+        if abre_caso:
+            casos_previos = [
+                c for rid, c in (historial_por_id or {}).items()
+                if rid != rep_id
+            ]
+            payload["brote"] = calcular_brote(
+                casos_previos,
+                payload["plaga"],
+                parcela_res["lat"],
+                parcela_res["lon"],
+                rep["recibido"],
+            )
+
+        if prueba:
+            res = api("POST", "/casos/validar", payload)
+            if abre_caso:
+                guardar_caso_historial(historial_por_id, {
+                    "reporte_id": rep_id,
+                    "parcela_id": parcela_res["id"],
+                    "lat": parcela_res["lat"],
+                    "lon": parcela_res["lon"],
+                    "plaga": payload["plaga"],
+                    "recibido": rep["recibido"],
+                    "semaforo": payload.get("semaforo"),
+                    "prioridad": payload.get("prioridad"),
+                    "tecnico_id": payload.get("tecnico_id"),
+                    "brote": payload.get("brote"),
+                }, persistir=False)
+            return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
+
+        res = api("POST", "/casos", payload)
+        if abre_caso:
+            guardar_caso_historial(historial_por_id, {
+                "reporte_id": rep_id,
+                "parcela_id": parcela_res["id"],
+                "lat": parcela_res["lat"],
+                "lon": parcela_res["lon"],
+                "plaga": payload["plaga"],
+                "recibido": rep["recibido"],
+                "semaforo": payload.get("semaforo"),
+                "prioridad": payload.get("prioridad"),
+                "tecnico_id": payload.get("tecnico_id"),
+                "brote": payload.get("brote"),
+            }, persistir=True)
+
+    with PREGUNTAS_LOCK:
+        if rep_id in preguntas_activas:
+            preguntas_activas.pop(rep_id, None)
+            guardar_preguntas_activas(preguntas_activas)
+
+    if abre_caso:
         emitir_avisos_caso(rep, payload, plagas.get(payload["plaga"]), parcela_res, parcelas)
 
     return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
 
 
+def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id):
+    """Procesa un reporte completo. Devuelve (estado, detalle): 'ok', 'omitido', 'esperando_respuesta' o lanza excepción."""
+    prep = preparar_reporte(rep, plagas, parcelas, preguntas_activas, respuestas_map, historial_por_id)
+    return finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id)
+
+
 def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial_por_id):
-    if not prueba:
-        procesar_telegram_updates()
     reportes = api("GET", "/reportes")
 
-    # Mapear respuestas de productores asociadas a reportes previos
+    # Mapear respuestas de productores asociadas a reportes previos (en orden cronológico)
     respuestas_map = {}
-    for r in reportes:
+    for r in sorted(reportes, key=lambda x: (x.get("recibido") or "", x["id"])):
         ref = r.get("respuesta_a")
         if ref:
             respuestas_map[ref] = r
@@ -532,10 +655,15 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
         key=lambda r: (r.get("recibido") or "", r["id"]),
     )
     if not pendientes:
+        if not prueba:
+            procesar_telegram_updates()
         return 0
 
-    # Los reportes nuevos pueden traer parcelas que aún no conocemos.
-    if any(r.get("parcela_id") and r["parcela_id"] not in parcelas for r in pendientes):
+    # Los reportes nuevos o las respuestas de productores pueden traer parcelas que aún no conocemos.
+    if any(
+        r.get("parcela_id") and r["parcela_id"] not in parcelas
+        for r in list(pendientes) + list(respuestas_map.values())
+    ):
         nuevas_plagas, nuevas_parcelas = cargar_catalogos()
         plagas.update(nuevas_plagas)
         parcelas.update(nuevas_parcelas)
@@ -544,14 +672,20 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
     t0 = time.time()
     procesados = 0
     with ThreadPoolExecutor(max_workers=HILOS) as ex:
+        # 1. Fase paralela: verificar registro e interpretar con IA concurrentemente
         futuros = {
-            ex.submit(atender, r, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id): r
+            r["id"]: ex.submit(preparar_reporte, r, plagas, parcelas, preguntas_activas, respuestas_map, historial_por_id)
             for r in pendientes
         }
-        for fut, rep in futuros.items():
+        # 2. Fase secuencial en orden cronológico (recibido, id): calcular brote + POST /casos + actualizar historial
+        for rep in pendientes:
             rep_id = rep["id"]
+            fut = futuros[rep_id]
             try:
-                estado, det = fut.result()
+                prep = fut.result()
+                estado, det = finalizar_atencion(
+                    rep, prep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id
+                )
             except Exception as e:  # red, IA o API: se reintenta en el siguiente ciclo
                 fallos[rep_id] = fallos.get(rep_id, 0) + 1
                 log(f"{rep_id} ({rep.get('tipo')}) ERROR intento {fallos[rep_id]}/{MAX_INTENTOS}: {e}")
@@ -568,6 +702,8 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
                 procesados += 1
                 log(f"{rep_id} ({rep.get('tipo')}) -> {json.dumps(det['payload'], ensure_ascii=False)} | API: {json.dumps(det['api'], ensure_ascii=False)}")
     log(f"ciclo terminado en {time.time() - t0:.1f}s")
+    if not prueba:
+        procesar_telegram_updates()
     return procesados
 
 
@@ -613,7 +749,9 @@ def main():
                 })
         log(f"Telegram listo (@CoordinadorAlertasBot): {len(_CASOS_PENDIENTES_TELEGRAM)} alertas en cola esperando /start del coordinador")
     hechos, fallos = set(), {}
-    preguntas_activas = {}
+    preguntas_activas = cargar_preguntas_activas()
+    if preguntas_activas:
+        log(f"Preguntas activas recuperadas: {len(preguntas_activas)}")
 
     if prueba:
         ciclo(plagas, parcelas, hechos, fallos, prueba=True, preguntas_activas=preguntas_activas, historial_por_id=historial_por_id)
