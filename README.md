@@ -114,6 +114,20 @@ pnpm start   # la publica en el puerto 3000
 
 Si cambias `.env`, vuelve a ejecutar `pnpm build`: los valores se integran al construir la aplicación.
 
+## Módulo de Clasificación y Reglas del Hackathon
+
+El proyecto incluye el motor de reglas determinista (`clasificador.py`) para el **Nivel 2 del Hackathon «Alerta Plaga»**:
+
+- **Cálculo de Prioridad (0 a 100):** Severidad + Superficie afectada + Etapa fenológica (o 100 directo para plagas cuarentenarias).
+- **Semáforo:** Asignación automática de nivel de atención (Verde, Amarillo, Naranja, Rojo).
+- **Asignación de Técnicos:** Selección por especialidad (`entomologia` / `fitopatologia`), filtro de carga (< 5) a la hora del reporte y distancia geodésica mínima (Haversine con $R = 6371\text{ km}$).
+- **Validación Oficial:** El script `validar_clasificador.py` comprueba las reglas contra los 40 casos de `GET /casos-previos` de la API de la junta, verificando 100% de coincidencia antes de registrar en producción.
+
+```bash
+# Ejecutar validación de los 40 casos oficiales
+python3 validar_clasificador.py
+```
+
 ## Llaves
 
 - `.env` contiene las llaves y no se sube al repositorio; está en `.gitignore`.
