@@ -838,5 +838,77 @@
     "prioridad": 71,
     "tecnico_id": "T-05",
     "brote": true
+  },
+  {
+    "reporte_id": "R-2104",
+    "parcela_id": "P-059",
+    "lat": 19.51372,
+    "lon": -98.81467,
+    "plaga": "tizon_tardio",
+    "recibido": "2026-10-21T12:45:43-06:00",
+    "semaforo": "amarillo",
+    "prioridad": 58,
+    "tecnico_id": "T-07",
+    "brote": false
+  },
+  {
+    "reporte_id": "R-2105",
+    "parcela_id": "P-093",
+    "lat": 19.54297,
+    "lon": -98.90025,
+    "plaga": "roya_frijol",
+    "recibido": "2026-10-21T12:48:37-06:00",
+    "semaforo": "naranja",
+    "prioridad": 81,
+    "tecnico_id": "T-05",
+    "brote": true
+  },
+  {
+    "reporte_id": "R-2107",
+    "parcela_id": "P-068",
+    "lat": 19.47382,
+    "lon": -98.83541,
+    "plaga": "tizon_tardio",
+    "recibido": "2026-10-21T12:51:35-06:00",
+    "semaforo": "amarillo",
+    "prioridad": 68,
+    "tecnico_id": "T-07",
+    "brote": true
+  },
+  {
+    "reporte_id": "R-2108",
+    "parcela_id": "P-171",
+    "lat": 19.58738,
+    "lon": -98.94125,
+    "plaga": "gallina_ciega",
+    "recibido": "2026-10-21T12:57:50-06:00",
+    "semaforo": "verde",
+    "prioridad": 32,
+    "tecnico_id": "T-02",
+    "brote": false
+  },
+  {
+    "reporte_id": "R-2109",
+    "parcela_id": "P-138",
+    "lat": 19.57029,
+    "lon": -98.83634,
+    "plaga": "chapulin",
+    "recibido": "2026-10-21T13:09:57-06:00",
+    "semaforo": "amarillo",
+    "prioridad": 56,
+    "tecnico_id": "T-04",
+    "brote": true
+  },
+  {
+    "reporte_id": "R-2090",
+    "parcela_id": "P-260",
+    "lat": 19.3364,
+    "lon": -98.7845,
+    "plaga": "mancha_chocolate",
+    "recibido": "2026-10-21T10:55:04-06:00",
+    "semaforo": "amarillo",
+    "prioridad": 68,
+    "tecnico_id": "T-12",
+    "brote": false
   }
 ]

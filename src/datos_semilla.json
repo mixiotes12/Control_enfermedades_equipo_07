@@ -7058,9 +7058,251 @@
       "recibido": "2026-10-21T12:13:49-06:00",
       "duracion_s": null,
       "respuesta_a": null
+    },
+    {
+      "id": "R-2104",
+      "productor_id": "PR-142",
+      "parcela_id": "P-059",
+      "tipo": "foto",
+      "texto": "¿Qué será esto? Ya está toda la parcela.",
+      "audio_url": null,
+      "foto_url": "/media/R-2104.jpg",
+      "lat": 19.51354,
+      "lon": -98.8147,
+      "recibido": "2026-10-21T12:45:43-06:00",
+      "duracion_s": null,
+      "respuesta_a": null
+    },
+    {
+      "id": "R-2105",
+      "productor_id": "PR-167",
+      "parcela_id": "P-093",
+      "tipo": "voz",
+      "texto": null,
+      "audio_url": "/media/R-2105.ogg",
+      "foto_url": null,
+      "lat": 19.54268,
+      "lon": -98.89991,
+      "recibido": "2026-10-21T12:48:37-06:00",
+      "duracion_s": 12.1,
+      "respuesta_a": null
+    },
+    {
+      "id": "R-2106",
+      "productor_id": "PR-181",
+      "parcela_id": null,
+      "tipo": "texto",
+      "texto": "Ya se está pasando a más matas, ¿cuándo vienen?",
+      "audio_url": null,
+      "foto_url": null,
+      "lat": null,
+      "lon": null,
+      "recibido": "2026-10-21T12:51:16-06:00",
+      "duracion_s": null,
+      "respuesta_a": null
+    },
+    {
+      "id": "R-2107",
+      "productor_id": "PR-149",
+      "parcela_id": "P-068",
+      "tipo": "voz",
+      "texto": null,
+      "audio_url": "/media/R-2107.ogg",
+      "foto_url": null,
+      "lat": 19.47378,
+      "lon": -98.83531,
+      "recibido": "2026-10-21T12:51:35-06:00",
+      "duracion_s": 9.1,
+      "respuesta_a": null
+    },
+    {
+      "id": "R-2108",
+      "productor_id": "PR-221",
+      "parcela_id": "P-171",
+      "tipo": "texto",
+      "texto": "Las matas se están cayendo y se arrancan bien fácil. Ya va como en una quinta parte. Ojalá puedan venir.",
+      "audio_url": null,
+      "foto_url": null,
+      "lat": 19.58753,
+      "lon": -98.94163,
+      "recibido": "2026-10-21T12:57:50-06:00",
+      "duracion_s": null,
+      "respuesta_a": null
+    },
+    {
+      "id": "R-2109",
+      "productor_id": "PR-198",
+      "parcela_id": "P-138",
+      "tipo": "texto",
+      "texto": "Buenas tardes, ingeniero. Brincan chapulines por todos lados y ya dejaron las matas peladas. Están todas las plantas así.",
+      "audio_url": null,
+      "foto_url": null,
+      "lat": 19.57047,
+      "lon": -98.83641,
+      "recibido": "2026-10-21T13:09:57-06:00",
+      "duracion_s": null,
+      "respuesta_a": null
     }
   ],
   "avisos": [
+    {
+      "id": 457,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2109",
+      "tipo": "brote",
+      "para": [
+        "PR-143",
+        "PR-197",
+        "coordinador"
+      ],
+      "mensaje": "Alerta de brote de chapulin en zona de P-138 (haba). Se recomienda revisar cultivos vecinos a menos de 5 km.",
+      "creado": "2026-10-21T13:10:09-06:00"
+    },
+    {
+      "id": 456,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2109",
+      "tipo": "asignacion",
+      "para": [
+        "T-04"
+      ],
+      "mensaje": "Asignación de caso R-2109: plaga chapulin en parcela P-138 (haba), semáforo amarillo.",
+      "creado": "2026-10-21T13:10:09-06:00"
+    },
+    {
+      "id": 455,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2109",
+      "tipo": "folio",
+      "para": [
+        "PR-198"
+      ],
+      "mensaje": "Su reporte R-2109 en parcela P-138 (chapulin, semáforo amarillo) fue registrado. Técnico asignado: T-04.",
+      "creado": "2026-10-21T13:10:08-06:00"
+    },
+    {
+      "id": 449,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2108",
+      "tipo": "asignacion",
+      "para": [
+        "T-02"
+      ],
+      "mensaje": "Asignación de caso R-2108: plaga gallina_ciega en parcela P-171 (maíz), semáforo verde.",
+      "creado": "2026-10-21T12:58:01-06:00"
+    },
+    {
+      "id": 448,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2108",
+      "tipo": "folio",
+      "para": [
+        "PR-221"
+      ],
+      "mensaje": "Su reporte R-2108 en parcela P-171 (gallina_ciega, semáforo verde) fue registrado. Técnico asignado: T-02.",
+      "creado": "2026-10-21T12:58:01-06:00"
+    },
+    {
+      "id": 445,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2107",
+      "tipo": "brote",
+      "para": [
+        "PR-142",
+        "PR-153",
+        "PR-154",
+        "coordinador"
+      ],
+      "mensaje": "Alerta de brote de tizon_tardio en zona de P-068 (papa). Se recomienda revisar cultivos vecinos a menos de 5 km.",
+      "creado": "2026-10-21T12:51:50-06:00"
+    },
+    {
+      "id": 444,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2107",
+      "tipo": "asignacion",
+      "para": [
+        "T-07"
+      ],
+      "mensaje": "Asignación de caso R-2107: plaga tizon_tardio en parcela P-068 (papa), semáforo amarillo.",
+      "creado": "2026-10-21T12:51:50-06:00"
+    },
+    {
+      "id": 443,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2107",
+      "tipo": "folio",
+      "para": [
+        "PR-149"
+      ],
+      "mensaje": "Su reporte R-2107 en parcela P-068 (tizon_tardio, semáforo amarillo) fue registrado. Técnico asignado: T-07.",
+      "creado": "2026-10-21T12:51:49-06:00"
+    },
+    {
+      "id": 436,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2105",
+      "tipo": "brote",
+      "para": [
+        "PR-110",
+        "PR-156",
+        "PR-157",
+        "PR-159",
+        "PR-160",
+        "PR-162",
+        "PR-163",
+        "PR-164",
+        "PR-172",
+        "PR-180",
+        "coordinador"
+      ],
+      "mensaje": "Alerta de brote de roya_frijol en zona de P-093 (frijol). Se recomienda revisar cultivos vecinos a menos de 5 km.",
+      "creado": "2026-10-21T12:48:45-06:00"
+    },
+    {
+      "id": 435,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2105",
+      "tipo": "asignacion",
+      "para": [
+        "T-05"
+      ],
+      "mensaje": "Asignación de caso R-2105: plaga roya_frijol en parcela P-093 (frijol), semáforo naranja.",
+      "creado": "2026-10-21T12:48:45-06:00"
+    },
+    {
+      "id": 434,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2105",
+      "tipo": "folio",
+      "para": [
+        "PR-167"
+      ],
+      "mensaje": "Su reporte R-2105 en parcela P-093 (roya_frijol, semáforo naranja) fue registrado. Técnico asignado: T-05.",
+      "creado": "2026-10-21T12:48:45-06:00"
+    },
+    {
+      "id": 424,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2104",
+      "tipo": "asignacion",
+      "para": [
+        "T-07"
+      ],
+      "mensaje": "Asignación de caso R-2104: plaga tizon_tardio en parcela P-059 (papa), semáforo amarillo.",
+      "creado": "2026-10-21T12:45:53-06:00"
+    },
+    {
+      "id": 423,
+      "equipo_id": "equipo07",
+      "reporte_id": "R-2104",
+      "tipo": "folio",
+      "para": [
+        "PR-142"
+      ],
+      "mensaje": "Su reporte R-2104 en parcela P-059 (tizon_tardio, semáforo amarillo) fue registrado. Técnico asignado: T-07.",
+      "creado": "2026-10-21T12:45:52-06:00"
+    },
     {
       "id": 418,
       "equipo_id": "equipo07",
@@ -10773,6 +11015,78 @@
       "prioridad": 71,
       "tecnico_id": "T-05",
       "brote": true
+    },
+    {
+      "reporte_id": "R-2104",
+      "parcela_id": "P-059",
+      "lat": 19.51372,
+      "lon": -98.81467,
+      "plaga": "tizon_tardio",
+      "recibido": "2026-10-21T12:45:43-06:00",
+      "semaforo": "amarillo",
+      "prioridad": 58,
+      "tecnico_id": "T-07",
+      "brote": false
+    },
+    {
+      "reporte_id": "R-2105",
+      "parcela_id": "P-093",
+      "lat": 19.54297,
+      "lon": -98.90025,
+      "plaga": "roya_frijol",
+      "recibido": "2026-10-21T12:48:37-06:00",
+      "semaforo": "naranja",
+      "prioridad": 81,
+      "tecnico_id": "T-05",
+      "brote": true
+    },
+    {
+      "reporte_id": "R-2107",
+      "parcela_id": "P-068",
+      "lat": 19.47382,
+      "lon": -98.83541,
+      "plaga": "tizon_tardio",
+      "recibido": "2026-10-21T12:51:35-06:00",
+      "semaforo": "amarillo",
+      "prioridad": 68,
+      "tecnico_id": "T-07",
+      "brote": true
+    },
+    {
+      "reporte_id": "R-2108",
+      "parcela_id": "P-171",
+      "lat": 19.58738,
+      "lon": -98.94125,
+      "plaga": "gallina_ciega",
+      "recibido": "2026-10-21T12:57:50-06:00",
+      "semaforo": "verde",
+      "prioridad": 32,
+      "tecnico_id": "T-02",
+      "brote": false
+    },
+    {
+      "reporte_id": "R-2109",
+      "parcela_id": "P-138",
+      "lat": 19.57029,
+      "lon": -98.83634,
+      "plaga": "chapulin",
+      "recibido": "2026-10-21T13:09:57-06:00",
+      "semaforo": "amarillo",
+      "prioridad": 56,
+      "tecnico_id": "T-04",
+      "brote": true
+    },
+    {
+      "reporte_id": "R-2090",
+      "parcela_id": "P-260",
+      "lat": 19.3364,
+      "lon": -98.7845,
+      "plaga": "mancha_chocolate",
+      "recibido": "2026-10-21T10:55:04-06:00",
+      "semaforo": "amarillo",
+      "prioridad": 68,
+      "tecnico_id": "T-12",
+      "brote": false
     }
   ]
 }
