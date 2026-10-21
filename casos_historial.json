@@ -5,7 +5,11 @@
     "parcela_id": "P-203",
     "plaga": "pulgon",
     "lat": 19.72487,
-    "lon": -98.84125
+    "lon": -98.84125,
+    "semaforo": "amarillo",
+    "prioridad": 45,
+    "tecnico_id": "T-11",
+    "brote": false
   },
   {
     "reporte_id": "R-2002",
@@ -13,7 +17,11 @@
     "parcela_id": "P-074",
     "plaga": "tizon_tardio",
     "lat": 19.45956,
-    "lon": -98.82802
+    "lon": -98.82802,
+    "semaforo": "amarillo",
+    "prioridad": 67,
+    "tecnico_id": "T-07",
+    "brote": false
   },
   {
     "reporte_id": "R-2003",
@@ -21,7 +29,11 @@
     "parcela_id": "P-224",
     "plaga": "gusano_cogollero",
     "lat": 19.69381,
-    "lon": -98.74113
+    "lon": -98.74113,
+    "semaforo": "amarillo",
+    "prioridad": 48,
+    "tecnico_id": "T-11",
+    "brote": false
   },
   {
     "reporte_id": "R-2004",
@@ -29,7 +41,11 @@
     "parcela_id": "P-020",
     "plaga": "tizon_tardio",
     "lat": 19.49758,
-    "lon": -98.87298
+    "lon": -98.87298,
+    "semaforo": "amarillo",
+    "prioridad": 65,
+    "tecnico_id": "T-01",
+    "brote": false
   },
   {
     "reporte_id": "R-2005",
@@ -37,7 +53,11 @@
     "parcela_id": "P-050",
     "plaga": "chapulin",
     "lat": 19.45237,
-    "lon": -98.8858
+    "lon": -98.8858,
+    "semaforo": "amarillo",
+    "prioridad": 67,
+    "tecnico_id": "T-08",
+    "brote": true
   },
   {
     "reporte_id": "R-2006",
@@ -45,7 +65,11 @@
     "parcela_id": "P-199",
     "plaga": "gusano_cogollero",
     "lat": 19.69815,
-    "lon": -98.8715
+    "lon": -98.8715,
+    "semaforo": "amarillo",
+    "prioridad": 63,
+    "tecnico_id": "T-11",
+    "brote": false
   },
   {
     "reporte_id": "R-2007",
@@ -53,7 +77,11 @@
     "parcela_id": "P-254",
     "plaga": "tizon_tardio",
     "lat": 19.18821,
-    "lon": -98.81058
+    "lon": -98.81058,
+    "semaforo": "amarillo",
+    "prioridad": 58,
+    "tecnico_id": "T-12",
+    "brote": false
   },
   {
     "reporte_id": "R-2009",
@@ -61,7 +89,11 @@
     "parcela_id": "P-100",
     "plaga": "mosquita_blanca",
     "lat": 19.55842,
-    "lon": -98.89522
+    "lon": -98.89522,
+    "semaforo": "amarillo",
+    "prioridad": 50,
+    "tecnico_id": "T-03",
+    "brote": false
   },
   {
     "reporte_id": "R-2011",
@@ -69,7 +101,11 @@
     "parcela_id": "P-053",
     "plaga": "chapulin",
     "lat": 19.46154,
-    "lon": -98.881
+    "lon": -98.881,
+    "semaforo": "naranja",
+    "prioridad": 84,
+    "tecnico_id": "T-08",
+    "brote": true
   },
   {
     "reporte_id": "R-2012",
@@ -77,7 +113,11 @@
     "parcela_id": "P-095",
     "plaga": "pulgon",
     "lat": 19.57337,
-    "lon": -98.91068
+    "lon": -98.91068,
+    "semaforo": "amarillo",
+    "prioridad": 44,
+    "tecnico_id": "T-03",
+    "brote": true
   },
   {
     "reporte_id": "R-2013",
@@ -85,7 +125,11 @@
     "parcela_id": "P-213",
     "plaga": "pulgon",
     "lat": 19.69124,
-    "lon": -98.84041
+    "lon": -98.84041,
+    "semaforo": "verde",
+    "prioridad": 34,
+    "tecnico_id": "T-11",
+    "brote": true
   },
   {
     "reporte_id": "R-2014",
@@ -93,7 +137,11 @@
     "parcela_id": "P-263",
     "plaga": "tizon_tardio",
     "lat": 19.20363,
-    "lon": -98.79858
+    "lon": -98.79858,
+    "semaforo": "amarillo",
+    "prioridad": 67,
+    "tecnico_id": "T-12",
+    "brote": false
   },
   {
     "reporte_id": "R-2015",
@@ -101,7 +149,11 @@
     "parcela_id": "P-002",
     "plaga": "gusano_cogollero",
     "lat": 19.50099,
-    "lon": -98.86341
+    "lon": -98.86341,
+    "semaforo": "amarillo",
+    "prioridad": 59,
+    "tecnico_id": "T-02",
+    "brote": true
   },
   {
     "reporte_id": "R-2016",
@@ -109,7 +161,11 @@
     "parcela_id": "P-088",
     "plaga": "roya_frijol",
     "lat": 19.52887,
-    "lon": -98.87204
+    "lon": -98.87204,
+    "semaforo": "naranja",
+    "prioridad": 71,
+    "tecnico_id": "T-05",
+    "brote": true
   },
   {
     "reporte_id": "R-2017",
@@ -117,7 +173,11 @@
     "parcela_id": "P-029",
     "plaga": "chapulin",
     "lat": 19.48667,
-    "lon": -98.85182
+    "lon": -98.85182,
+    "semaforo": "amarillo",
+    "prioridad": 64,
+    "tecnico_id": "T-02",
+    "brote": false
   },
   {
     "reporte_id": "R-2019",
@@ -125,7 +185,11 @@
     "parcela_id": "P-046",
     "plaga": "roya_frijol",
     "lat": 19.43632,
-    "lon": -98.87916
+    "lon": -98.87916,
+    "semaforo": "amarillo",
+    "prioridad": 59,
+    "tecnico_id": "T-07",
+    "brote": true
   },
   {
     "reporte_id": "R-2021",
@@ -133,7 +197,11 @@
     "parcela_id": "P-195",
     "plaga": "chapulin",
     "lat": 19.69769,
-    "lon": -98.8546
+    "lon": -98.8546,
+    "semaforo": "naranja",
+    "prioridad": 73,
+    "tecnico_id": "T-11",
+    "brote": false
   },
   {
     "reporte_id": "R-2022",
@@ -141,7 +209,11 @@
     "parcela_id": "P-070",
     "plaga": "gusano_cogollero",
     "lat": 19.48043,
-    "lon": -98.8287
+    "lon": -98.8287,
+    "semaforo": "naranja",
+    "prioridad": 72,
+    "tecnico_id": "T-02",
+    "brote": true
   },
   {
     "reporte_id": "R-2025",
@@ -149,7 +221,11 @@
     "parcela_id": "P-124",
     "plaga": "roya_frijol",
     "lat": 19.55895,
-    "lon": -98.85381
+    "lon": -98.85381,
+    "semaforo": "amarillo",
+    "prioridad": 66,
+    "tecnico_id": "T-09",
+    "brote": true
   },
   {
     "reporte_id": "R-2027",
@@ -157,7 +233,11 @@
     "parcela_id": "P-042",
     "plaga": "gusano_cogollero",
     "lat": 19.45764,
-    "lon": -98.85615
+    "lon": -98.85615,
+    "semaforo": "amarillo",
+    "prioridad": 69,
+    "tecnico_id": "T-08",
+    "brote": true
   },
   {
     "reporte_id": "R-2029",
@@ -165,7 +245,11 @@
     "parcela_id": "P-026",
     "plaga": "gusano_cogollero",
     "lat": 19.48257,
-    "lon": -98.86956
+    "lon": -98.86956,
+    "semaforo": "amarillo",
+    "prioridad": 47,
+    "tecnico_id": "T-08",
+    "brote": true
   },
   {
     "reporte_id": "R-2030",
@@ -173,7 +257,11 @@
     "parcela_id": "P-212",
     "plaga": "gusano_cogollero",
     "lat": 19.69616,
-    "lon": -98.82165
+    "lon": -98.82165,
+    "semaforo": "amarillo",
+    "prioridad": 59,
+    "tecnico_id": "T-11",
+    "brote": false
   },
   {
     "reporte_id": "R-2031",
@@ -181,7 +269,11 @@
     "parcela_id": "P-210",
     "plaga": "pulgon",
     "lat": 19.72514,
-    "lon": -98.84055
+    "lon": -98.84055,
+    "semaforo": "amarillo",
+    "prioridad": 43,
+    "tecnico_id": "T-11",
+    "brote": true
   },
   {
     "reporte_id": "R-2032",
@@ -189,7 +281,11 @@
     "parcela_id": "P-128",
     "plaga": "pulgon",
     "lat": 19.58126,
-    "lon": -98.80192
+    "lon": -98.80192,
+    "semaforo": "amarillo",
+    "prioridad": 65,
+    "tecnico_id": "T-04",
+    "brote": false
   },
   {
     "reporte_id": "R-2036",
@@ -197,7 +293,11 @@
     "parcela_id": "P-238",
     "plaga": "mancha_chocolate",
     "lat": 19.3848,
-    "lon": -98.84859
+    "lon": -98.84859,
+    "semaforo": "amarillo",
+    "prioridad": 42,
+    "tecnico_id": "T-12",
+    "brote": false
   },
   {
     "reporte_id": "R-2037",
@@ -205,7 +305,11 @@
     "parcela_id": "P-014",
     "plaga": "hlb",
     "lat": 19.52797,
-    "lon": -98.88739
+    "lon": -98.88739,
+    "semaforo": "rojo",
+    "prioridad": 100,
+    "tecnico_id": "T-05",
+    "brote": false
   },
   {
     "reporte_id": "R-2038",
@@ -213,7 +317,11 @@
     "parcela_id": "P-085",
     "plaga": "roya_frijol",
     "lat": 19.54791,
-    "lon": -98.8952
+    "lon": -98.8952,
+    "semaforo": "amarillo",
+    "prioridad": 67,
+    "tecnico_id": "T-05",
+    "brote": true
   },
   {
     "reporte_id": "R-2039",
@@ -221,7 +329,11 @@
     "parcela_id": "P-001",
     "plaga": "gusano_cogollero",
     "lat": 19.51046,
-    "lon": -98.88248
+    "lon": -98.88248,
+    "semaforo": "amarillo",
+    "prioridad": 68,
+    "tecnico_id": "T-02",
+    "brote": true
   },
   {
     "reporte_id": "R-2040",
@@ -229,7 +341,11 @@
     "parcela_id": "P-206",
     "plaga": "mosquita_blanca",
     "lat": 19.70259,
-    "lon": -98.82459
+    "lon": -98.82459,
+    "semaforo": "amarillo",
+    "prioridad": 53,
+    "tecnico_id": "T-11",
+    "brote": false
   },
   {
     "reporte_id": "R-2041",
@@ -237,7 +353,11 @@
     "parcela_id": "P-040",
     "plaga": "gusano_cogollero",
     "lat": 19.47389,
-    "lon": -98.8713
+    "lon": -98.8713,
+    "semaforo": "amarillo",
+    "prioridad": 68,
+    "tecnico_id": "T-08",
+    "brote": true
   },
   {
     "reporte_id": "R-2043",
@@ -245,7 +365,11 @@
     "parcela_id": "P-127",
     "plaga": "pulgon",
     "lat": 19.56513,
-    "lon": -98.83094
+    "lon": -98.83094,
+    "semaforo": "amarillo",
+    "prioridad": 43,
+    "tecnico_id": "T-04",
+    "brote": false
   },
   {
     "reporte_id": "R-2044",
@@ -253,7 +377,11 @@
     "parcela_id": "P-129",
     "plaga": "chapulin",
     "lat": 19.56294,
-    "lon": -98.82354
+    "lon": -98.82354,
+    "semaforo": "amarillo",
+    "prioridad": 48,
+    "tecnico_id": "T-04",
+    "brote": false
   },
   {
     "reporte_id": "R-2045",
@@ -261,7 +389,11 @@
     "parcela_id": "P-132",
     "plaga": "chapulin",
     "lat": 19.58102,
-    "lon": -98.83088
+    "lon": -98.83088,
+    "semaforo": "naranja",
+    "prioridad": 80,
+    "tecnico_id": "T-04",
+    "brote": true
   },
   {
     "reporte_id": "R-2046",
@@ -269,7 +401,11 @@
     "parcela_id": "P-158",
     "plaga": "roya_frijol",
     "lat": 19.41875,
-    "lon": -98.91092
+    "lon": -98.91092,
+    "semaforo": "amarillo",
+    "prioridad": 56,
+    "tecnico_id": "T-01",
+    "brote": true
   },
   {
     "reporte_id": "R-2047",
@@ -277,7 +413,11 @@
     "parcela_id": "P-239",
     "plaga": "gallina_ciega",
     "lat": 19.30374,
-    "lon": -98.89505
+    "lon": -98.89505,
+    "semaforo": "amarillo",
+    "prioridad": 52,
+    "tecnico_id": "T-06",
+    "brote": false
   },
   {
     "reporte_id": "R-2050",
@@ -285,7 +425,11 @@
     "parcela_id": "P-030",
     "plaga": "chapulin",
     "lat": 19.49614,
-    "lon": -98.87618
+    "lon": -98.87618,
+    "semaforo": "amarillo",
+    "prioridad": 64,
+    "tecnico_id": "T-02",
+    "brote": true
   },
   {
     "reporte_id": "R-2051",
@@ -293,7 +437,11 @@
     "parcela_id": "P-147",
     "plaga": "gusano_cogollero",
     "lat": 19.6146,
-    "lon": -98.91341
+    "lon": -98.91341,
+    "semaforo": "amarillo",
+    "prioridad": 69,
+    "tecnico_id": "T-10",
+    "brote": false
   },
   {
     "reporte_id": "R-2052",
@@ -301,7 +449,11 @@
     "parcela_id": "P-191",
     "plaga": "roya_frijol",
     "lat": 19.70152,
-    "lon": -98.85501
+    "lon": -98.85501,
+    "semaforo": "amarillo",
+    "prioridad": 47,
+    "tecnico_id": "T-09",
+    "brote": false
   },
   {
     "reporte_id": "R-2055",
@@ -309,7 +461,11 @@
     "parcela_id": "P-094",
     "plaga": "gusano_cogollero",
     "lat": 19.55885,
-    "lon": -98.9174
+    "lon": -98.9174,
+    "semaforo": "naranja",
+    "prioridad": 70,
+    "tecnico_id": "T-03",
+    "brote": true
   },
   {
     "reporte_id": "R-2059",
@@ -317,7 +473,11 @@
     "parcela_id": "P-259",
     "plaga": "gusano_cogollero",
     "lat": 19.19356,
-    "lon": -98.79432
+    "lon": -98.79432,
+    "semaforo": "rojo",
+    "prioridad": 90,
+    "tecnico_id": "T-06",
+    "brote": false
   },
   {
     "reporte_id": "R-2061",
@@ -325,7 +485,11 @@
     "parcela_id": "P-045",
     "plaga": "mancha_chocolate",
     "lat": 19.43575,
-    "lon": -98.86369
+    "lon": -98.86369,
+    "semaforo": "amarillo",
+    "prioridad": 54,
+    "tecnico_id": "T-07",
+    "brote": false
   },
   {
     "reporte_id": "R-2062",
@@ -333,6 +497,10 @@
     "parcela_id": "P-190",
     "plaga": "pulgon",
     "lat": 19.66803,
-    "lon": -98.86168
+    "lon": -98.86168,
+    "semaforo": "amarillo",
+    "prioridad": 61,
+    "tecnico_id": "T-11",
+    "brote": true
   }
 ]

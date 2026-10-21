@@ -27,7 +27,12 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from clasificador import calcular_prioridad_y_semaforo, seleccionar_tecnico, calcular_brote
+from clasificador import (
+    calcular_prioridad_y_semaforo,
+    seleccionar_tecnico,
+    calcular_brote,
+    haversine_km,
+)
 from interprete import interpretar_mensaje_texto, transcribir_audio
 
 INTERVALO = 20      # segundos entre consultas a /reportes
@@ -71,6 +76,10 @@ def cfg(*nombres):
 API_BASE = cfg("API_REPORTES", "API_HACKATHON")
 TOKEN = cfg("TOKEN", "TOKEN_EQUIPO")
 API_KEY = cfg("API_OPEN_ROUTER")
+TELEGRAM_TOKEN = cfg("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = cfg("TELEGRAM_CHAT_ID")
+_TELEGRAM_OFFSET = 0
+_CASOS_PENDIENTES_TELEGRAM = []  # Cola de alertas pendientes si el coordinador aún no envía /start
 
 
 def api(metodo, ruta, datos=None, timeout=30):
@@ -160,6 +169,221 @@ def enviar_pregunta(rep_id, texto):
     except Exception as e:
         log(f"Error enviando pregunta para {rep_id}: {e}")
         return False
+
+
+def tg_api(metodo, datos=None):
+    """Llama a la API de Telegram Bot."""
+    if not TELEGRAM_TOKEN:
+        return None
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{metodo}"
+    cuerpo = json.dumps(datos).encode("utf-8") if datos is not None else None
+    req = urllib.request.Request(url, data=cuerpo, method="POST" if datos else "GET",
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def guardar_chat_id(chat_id):
+    global TELEGRAM_CHAT_ID
+    TELEGRAM_CHAT_ID = str(chat_id)
+    ruta = os.path.join(AQUI, ".env")
+    try:
+        lineas = []
+        if os.path.exists(ruta):
+            with open(ruta, encoding="utf-8") as f:
+                lineas = [l for l in f if not l.strip().startswith("TELEGRAM_CHAT_ID=")]
+        lineas.append(f"TELEGRAM_CHAT_ID={TELEGRAM_CHAT_ID}\n")
+        with open(ruta, "w", encoding="utf-8") as f:
+            f.writelines(lineas)
+        log(f"TELEGRAM_CHAT_ID={TELEGRAM_CHAT_ID} guardado en .env")
+    except Exception as e:
+        log(f"Aviso guardando TELEGRAM_CHAT_ID: {e}")
+
+
+def enviar_alerta_telegram(alerta):
+    """Envía al coordinador por Telegram una alerta de caso rojo, naranja o con brote."""
+    if not TELEGRAM_TOKEN:
+        return False
+    if not TELEGRAM_CHAT_ID:
+        _CASOS_PENDIENTES_TELEGRAM.append(alerta)
+        return False
+
+    icono_sem = {"rojo": "🔴 ROJO", "naranja": "🟠 NARANJA", "amarillo": "🟡 AMARILLO", "verde": "🟢 VERDE"}.get(
+        alerta["semaforo"], alerta["semaforo"]
+    )
+    txt_brote = "⚠️ *¡SÍ HAY BROTE EN LA ZONA!* (≥3 casos en ≤5 km / 7 días)\n" if alerta["brote"] else ""
+    texto = (
+        f"🚨 *ALERTA FITOSANITARIA — {alerta['reporte_id']}*\n"
+        f"{txt_brote}"
+        f"• *Semáforo:* {icono_sem} (Prioridad: {alerta.get('prioridad', '-')}/100)\n"
+        f"• *Plaga:* `{alerta['plaga']}`\n"
+        f"• *Parcela:* `{alerta['parcela_id']}` ({alerta.get('cultivo', '')}, {alerta.get('hectareas', '')} ha)\n"
+        f"• *Productor:* `{alerta.get('productor_id', '-')}`\n"
+        f"• *Técnico asignado:* `{alerta.get('tecnico_id') or 'Sin disponibilidad'}`"
+    )
+    teclado = {
+        "inline_keyboard": [[
+            {"text": "✅ Aprobar asignación", "callback_data": f"aprobar|{alerta['reporte_id']}|{alerta.get('productor_id','')}|{alerta.get('tecnico_id','')}"},
+            {"text": "🔄 Cambiar técnico", "callback_data": f"cambiar|{alerta['reporte_id']}|{alerta.get('productor_id','')}|{alerta.get('tecnico_id','')}"},
+        ]]
+    }
+    try:
+        tg_api("sendMessage", {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": texto,
+            "parse_mode": "Markdown",
+            "reply_markup": teclado,
+        })
+        log(f"Alerta Telegram enviada para {alerta['reporte_id']}")
+        return True
+    except Exception as e:
+        log(f"Error enviando Telegram para {alerta['reporte_id']}: {e}")
+        return False
+
+
+def procesar_telegram_updates():
+    """Descubre automáticamente el chat_id del coordinador y atiende botones Aprobar / Cambiar técnico."""
+    global _TELEGRAM_OFFSET
+    if not TELEGRAM_TOKEN:
+        return
+    try:
+        res = tg_api("getUpdates", {"offset": _TELEGRAM_OFFSET, "timeout": 1})
+        if not res or not res.get("ok"):
+            return
+        for upd in res.get("result", []):
+            _TELEGRAM_OFFSET = upd["update_id"] + 1
+            msg = upd.get("message") or upd.get("edited_message")
+            if msg and msg.get("chat", {}).get("id"):
+                cid = str(msg["chat"]["id"])
+                if not TELEGRAM_CHAT_ID:
+                    guardar_chat_id(cid)
+                    tg_api("sendMessage", {
+                        "chat_id": cid,
+                        "text": "✅ *Bot de Alerta Plaga (Equipo 07 - MISA) vinculado.*\nRecibirás aquí los casos rojos, naranjas y brotes con botones de aprobación.",
+                        "parse_mode": "Markdown",
+                    })
+                    while _CASOS_PENDIENTES_TELEGRAM:
+                        enviar_alerta_telegram(_CASOS_PENDIENTES_TELEGRAM.pop(0))
+
+            cb = upd.get("callback_query")
+            if cb:
+                cid = str(cb["message"]["chat"]["id"])
+                if not TELEGRAM_CHAT_ID:
+                    guardar_chat_id(cid)
+                datos = (cb.get("data") or "").split("|")
+                accion = datos[0] if datos else ""
+                rep_id = datos[1] if len(datos) > 1 else ""
+                prod_id = datos[2] if len(datos) > 2 else ""
+                tec_id = datos[3] if len(datos) > 3 else ""
+                if accion == "aprobar" and rep_id:
+                    tg_api("answerCallbackQuery", {"callback_query_id": cb["id"], "text": f"Caso {rep_id} aprobado"})
+                    tg_api("sendMessage", {
+                        "chat_id": cid,
+                        "text": f"✅ *Caso {rep_id} aprobado por el coordinador.* Folio confirmado a `{prod_id}` y orden enviada a `{tec_id}`.",
+                        "parse_mode": "Markdown",
+                    })
+                elif accion == "cambiar" and rep_id:
+                    alt_tec = "T-02" if tec_id != "T-02" else "T-01"
+                    try:
+                        api("POST", "/avisos", {
+                            "reporte_id": rep_id,
+                            "tipo": "asignacion",
+                            "para": alt_tec,
+                            "mensaje": f"Reasignación por el coordinador para atender el caso {rep_id}.",
+                        })
+                    except Exception:
+                        pass
+                    tg_api("answerCallbackQuery", {"callback_query_id": cb["id"], "text": f"Reasignado a {alt_tec}"})
+                    tg_api("sendMessage", {
+                        "chat_id": cid,
+                        "text": f"🔄 *Caso {rep_id} reasignado a `{alt_tec}`* por indicación del coordinador.",
+                        "parse_mode": "Markdown",
+                    })
+    except Exception as e:
+        log(f"Aviso en procesar_telegram_updates: {e}")
+
+
+def emitir_avisos_caso(rep, payload, plaga, parcela, parcelas):
+    """Registra los avisos en POST /avisos (folio, asignación, cuarentenaria, brote a vecinos) y alerta por Telegram."""
+    rep_id = payload["reporte_id"]
+    prod_id = rep.get("productor_id") or parcela.get("productor_id")
+    tec_id = payload.get("tecnico_id")
+    semaforo = payload.get("semaforo")
+    brote = bool(payload.get("brote"))
+    plaga_id = payload.get("plaga")
+
+    # 1. Aviso de folio al productor
+    if prod_id:
+        try:
+            api("POST", "/avisos", {
+                "reporte_id": rep_id,
+                "tipo": "folio",
+                "para": prod_id,
+                "mensaje": f"Su reporte {rep_id} en parcela {parcela['id']} ({plaga_id}, semáforo {semaforo}) fue registrado. Técnico asignado: {tec_id or 'en asignación'}.",
+            })
+        except Exception as e:
+            log(f"Aviso folio {rep_id}: {e}")
+
+    # 2. Aviso de asignación al técnico
+    if tec_id:
+        try:
+            api("POST", "/avisos", {
+                "reporte_id": rep_id,
+                "tipo": "asignacion",
+                "para": tec_id,
+                "mensaje": f"Asignación de caso {rep_id}: plaga {plaga_id} en parcela {parcela['id']} ({parcela.get('cultivo')}), semáforo {semaforo}.",
+            })
+        except Exception as e:
+            log(f"Aviso asignacion {rep_id}: {e}")
+
+    # 3. Plaga cuarentenaria -> aviso inmediato a sanidad_vegetal
+    if plaga and plaga.get("cuarentenaria"):
+        try:
+            api("POST", "/avisos", {
+                "reporte_id": rep_id,
+                "tipo": "cuarentenaria",
+                "para": "sanidad_vegetal",
+                "mensaje": f"ALERTA CUARENTENARIA en reporte {rep_id}: {plaga_id} detectada en parcela {parcela['id']} ({parcela.get('cultivo')}).",
+            })
+        except Exception as e:
+            log(f"Aviso cuarentenaria {rep_id}: {e}")
+
+    # 4. Brote -> aviso al coordinador y a productores vecinos (< 5 km, mismo cultivo, sin contar al que reportó)
+    if brote:
+        vecinos = set()
+        for p_vec in parcelas.values():
+            p_prod = p_vec.get("productor_id")
+            if not p_prod or p_prod == prod_id:
+                continue
+            if p_vec.get("cultivo") == parcela.get("cultivo"):
+                dist = haversine_km(parcela["lat"], parcela["lon"], p_vec["lat"], p_vec["lon"])
+                if dist <= 5.0:
+                    vecinos.add(p_prod)
+        destinatarios = sorted(vecinos) + ["coordinador"]
+        try:
+            api("POST", "/avisos", {
+                "reporte_id": rep_id,
+                "tipo": "brote",
+                "para": destinatarios,
+                "mensaje": f"Alerta de brote de {plaga_id} en zona de {parcela['id']} ({parcela.get('cultivo')}). Se recomienda revisar cultivos vecinos a menos de 5 km.",
+            })
+        except Exception as e:
+            log(f"Aviso brote {rep_id}: {e}")
+
+    # 5. Si es rojo, naranja o tiene brote -> avisar al coordinador por Telegram
+    if semaforo in ("rojo", "naranja") or brote:
+        enviar_alerta_telegram({
+            "reporte_id": rep_id,
+            "semaforo": semaforo,
+            "prioridad": payload.get("prioridad"),
+            "plaga": plaga_id,
+            "parcela_id": parcela["id"],
+            "cultivo": parcela.get("cultivo"),
+            "hectareas": parcela.get("superficie_ha") or parcela.get("hectareas"),
+            "productor_id": prod_id,
+            "tecnico_id": tec_id,
+            "brote": brote,
+        })
 
 
 def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=None):
@@ -268,7 +492,7 @@ def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, hi
     res = api("POST", "/casos", payload)
     preguntas_activas.pop(rep_id, None)
 
-    # Si abrió un caso nuevo (tiene semáforo y parcela resuelta), guardarlo en el historial para futuros brotes
+    # Si abrió un caso nuevo (tiene semáforo y parcela resuelta), guardarlo en el historial y emitir avisos
     parcela_res = ia.get("parcela_resuelta")
     if payload.get("es_plaga") and "semaforo" in payload and parcela_res:
         guardar_caso_historial(historial_por_id, {
@@ -278,12 +502,19 @@ def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, hi
             "lon": parcela_res["lon"],
             "plaga": payload["plaga"],
             "recibido": rep["recibido"],
+            "semaforo": payload.get("semaforo"),
+            "prioridad": payload.get("prioridad"),
+            "tecnico_id": payload.get("tecnico_id"),
+            "brote": payload.get("brote"),
         })
+        emitir_avisos_caso(rep, payload, plagas.get(payload["plaga"]), parcela_res, parcelas)
 
     return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
 
 
 def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial_por_id):
+    if not prueba:
+        procesar_telegram_updates()
     reportes = api("GET", "/reportes")
 
     # Mapear respuestas de productores asociadas a reportes previos
@@ -364,6 +595,23 @@ def main():
     plagas, parcelas = cargar_catalogos()
     historial_por_id = cargar_historial_base()
     log(f"Historial cargado con {len(historial_por_id)} casos base para cálculo de brotes")
+    if TELEGRAM_TOKEN and not TELEGRAM_CHAT_ID:
+        for rid, c in sorted(historial_por_id.items()):
+            if str(rid).startswith("R-2") and (c.get("semaforo") in ("rojo", "naranja") or c.get("brote")):
+                parc = parcelas.get(c.get("parcela_id"), {})
+                _CASOS_PENDIENTES_TELEGRAM.append({
+                    "reporte_id": rid,
+                    "semaforo": c.get("semaforo"),
+                    "prioridad": c.get("prioridad"),
+                    "plaga": c.get("plaga"),
+                    "parcela_id": c.get("parcela_id"),
+                    "cultivo": parc.get("cultivo"),
+                    "hectareas": parc.get("superficie_ha"),
+                    "productor_id": parc.get("productor_id"),
+                    "tecnico_id": c.get("tecnico_id"),
+                    "brote": bool(c.get("brote")),
+                })
+        log(f"Telegram listo (@CoordinadorAlertasBot): {len(_CASOS_PENDIENTES_TELEGRAM)} alertas en cola esperando /start del coordinador")
     hechos, fallos = set(), {}
     preguntas_activas = {}
 

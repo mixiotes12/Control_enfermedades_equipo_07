@@ -152,6 +152,9 @@ Procesa lenguaje natural con el modelo multimodal vía OpenRouter:
 Corre en el servidor (supervisor, slot `agente`), consulta `GET /reportes` cada 20 s y registra con `POST /casos` los mensajes nuevos, hasta 6 en paralelo.
 - **Validación previa:** Antes de gastar llamadas de IA, consulta `/casos/validar` para omitir los ya registrados.
 - **Mecanismo de Interacción con Productores (`POST /preguntas`):** Si un reporte legítimo nuevo carece de parcela (`parcela_id: null`) o síntomas claros de plaga, el agente emite una pregunta al productor vía API y espera su respuesta (`respuesta_a`) integrándola antes de calcular el semáforo y asignar técnico.
+- **Notificaciones por Telegram y Buzón de Avisos (`POST /avisos`):**
+  - Registra automáticamente avisos de `folio` al productor, `asignacion` al técnico, alerta `cuarentenaria` a `"sanidad_vegetal"` y alertas de `brote` a los productores vecinos con el mismo cultivo a $\le 5\text{ km}$.
+  - Envía alertas en tiempo real al coordinador por Telegram (`@CoordinadorAlertasBot`) cuando el semáforo es `rojo`, `naranja` o hay `brote`, incluyendo botones interactivos (**✅ Aprobar asignación** y **🔄 Cambiar técnico**).
 - **Timeout controlado:** Si el productor no contesta en 300 segundos, se registra de manera segura con `"desconocida"` evitando pérdidas de puntos por omisión.
 - `python agente.py --prueba` hace una pasada que solo valida y no registra nada. Las llaves van en `~/agente/.env` (no se sube al repositorio).
 
