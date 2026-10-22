@@ -18,6 +18,7 @@ Configuración (variables de entorno o archivo .env junto a este script):
 """
 import json
 import os
+import re
 import sys
 import threading
 import time
