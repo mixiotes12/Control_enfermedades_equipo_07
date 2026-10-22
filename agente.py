@@ -33,7 +33,13 @@ from clasificador import (
     calcular_brote,
     haversine_km,
 )
-from interprete import interpretar_mensaje_texto, transcribir_audio
+from interprete import (
+    interpretar_mensaje_texto,
+    transcribir_audio,
+    SaldoAgotadoError,
+    ejecutar_solicitud_gemini,
+    ejecutar_solicitud_openrouter,
+)
 
 INTERVALO = 8       # segundos entre consultas a /reportes
 HILOS = 4           # reportes procesados en paralelo (cuidando rate limit)
@@ -78,7 +84,7 @@ def cfg(*nombres):
 
 API_BASE = cfg("API_REPORTES", "API_HACKATHON")
 TOKEN = cfg("TOKEN", "TOKEN_EQUIPO")
-API_KEY = cfg("API_OPEN_ROUTER")
+API_KEY = cfg("GEMINI_API_KEY", "API_OPEN_ROUTER")
 TELEGRAM_TOKEN = cfg("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = cfg("TELEGRAM_CHAT_ID")
 _TELEGRAM_OFFSET = 0
@@ -110,6 +116,29 @@ def cargar_catalogos():
     plagas = {p["id"]: p for p in api("GET", "/plagas")}
     parcelas = {p["id"]: p for p in api("GET", "/parcelas")}
     return plagas, parcelas
+
+
+_VISITAS_CACHE = {"timestamp": 0, "datos": {}}
+_VISITAS_LOCK = threading.Lock()
+
+
+def obtener_visitas():
+    """Consulta GET /visitas con caché corto (5s) para no saturar la API."""
+    ahora = time.time()
+    with _VISITAS_LOCK:
+        if _VISITAS_CACHE["timestamp"] > 0 and (ahora - _VISITAS_CACHE["timestamp"] < 5):
+            return _VISITAS_CACHE["datos"]
+    try:
+        data = api("GET", "/visitas")
+        visitas_map = {v["reporte_id"]: v for v in data if "reporte_id" in v}
+        with _VISITAS_LOCK:
+            _VISITAS_CACHE["timestamp"] = ahora
+            _VISITAS_CACHE["datos"] = visitas_map
+        return visitas_map
+    except Exception as e:
+        log(f"Aviso al consultar /visitas: {e}")
+        with _VISITAS_LOCK:
+            return _VISITAS_CACHE["datos"]
 
 
 def cargar_historial_base():
@@ -461,24 +490,37 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
     cultivo = parcela["cultivo"] if parcela else None
 
     # Verificar si esta parcela ya tiene un caso activo abierto en el periodo del hackathon
+    # Regla oficial (BUG-04): dentro de 24 horas (86400s) AND sin visita técnica completada en GET /visitas
     tiene_caso_activo = False
     if parcela_id:
         try:
             t_actual = datetime.fromisoformat(rep["recibido"])
         except Exception:
             t_actual = datetime.now()
+        visitas_dict = obtener_visitas()
         with HISTORIAL_LOCK:
             for c in (historial_por_id or {}).values():
                 if c.get("parcela_id") == parcela_id and c.get("reporte_id") != rep_id:
-                    if str(c.get("reporte_id", "")).startswith("R-2"):
+                    rid_prev = str(c.get("reporte_id", ""))
+                    if rid_prev.startswith("R-"):
                         try:
                             t_prev = datetime.fromisoformat(c["recibido"])
-                            if t_actual >= t_prev and (t_actual - t_prev).total_seconds() <= 86400 * 3:
-                                tiene_caso_activo = True
-                                break
+                            delta_s = (t_actual - t_prev).total_seconds()
+                            if 0 <= delta_s <= 86400:
+                                visita = (visitas_dict or {}).get(rid_prev)
+                                ya_visitado = False
+                                if visita:
+                                    try:
+                                        t_visita = datetime.fromisoformat(visita["fecha"])
+                                        if t_visita <= t_actual:
+                                            ya_visitado = True
+                                    except Exception:
+                                        ya_visitado = True
+                                if not ya_visitado:
+                                    tiene_caso_activo = True
+                                    break
                         except Exception:
-                            tiene_caso_activo = True
-                            break
+                            pass
 
     texto = (rep.get("texto") or "") + texto_adicional
     if not texto.strip():
@@ -492,7 +534,8 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
         foto = descargar(rep["foto_url"])
 
     contexto_parcela = {"cultivo": cultivo, "caso_previo_activo": tiene_caso_activo}
-    ia = interpretar_mensaje_texto(texto=texto, cultivo_parcela=contexto_parcela, api_key=API_KEY, foto_bytes=foto)
+    es_voz = rep.get("tipo") == "voz" or bool(rep.get("audio_url"))
+    ia = interpretar_mensaje_texto(texto=texto, cultivo_parcela=contexto_parcela, api_key=API_KEY, foto_bytes=foto, es_voz=es_voz)
 
     if not ia.get("es_plaga"):
         return {"reporte_id": rep_id, "es_plaga": False}, ia
@@ -516,13 +559,24 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
         if plaga_id != "desconocida" and plaga_id not in permitidas:
             log(f"Aviso [{rep_id}]: plaga {plaga_id} incompatible con cultivo {cultivo_norm}. Ajustando...")
             if len(permitidas) == 1:
-                plaga_id = permitidas[0]
-                plaga = plagas.get(plaga_id)
-                ia["plaga"] = plaga_id
+                plaga_unica = permitidas[0]
+                from interprete import SINTOMAS_CLAVE
+                txt_comp = ((rep.get("texto") or "") + (texto_adicional or "")).lower()
+                sintomas_unica = SINTOMAS_CLAVE.get(plaga_unica, [])
+                if any(kw in txt_comp for kw in sintomas_unica):
+                    plaga_id = plaga_unica
+                    plaga = plagas.get(plaga_id)
+                    ia["plaga"] = plaga_id
+                else:
+                    plaga_id = "desconocida"
+                    plaga = None
+                    ia["plaga"] = "desconocida"
+                    ia["confianza"] = "baja"
             else:
                 plaga_id = "desconocida"
                 plaga = None
                 ia["plaga"] = "desconocida"
+                ia["confianza"] = "baja"
 
     # Si falta información clave (parcela desconocida o plaga desconocida en reporte nuevo),
     # señalizar 'necesita_pregunta' para enviar pregunta antes de registrar
@@ -606,8 +660,12 @@ def preparar_reporte(rep, plagas, parcelas, preguntas_activas, respuestas_map, h
         else:
             log(f"{rep_id}: Se agotó el tiempo de espera ({TIMEOUT_PREGUNTA_S}s) de respuesta del productor. Registrando...")
 
-    payload, ia = armar_payload(rep, plagas, parcelas, respuestas_map, historial_por_id)
-    return "listo", payload, ia
+    try:
+        payload, ia = armar_payload(rep, plagas, parcelas, respuestas_map, historial_por_id)
+        return "listo", payload, ia
+    except SaldoAgotadoError as e:
+        log(f"🚨 [CIRCUIT BREAKER] Saldo agotado detectado al procesar {rep_id}: {e}. Cancelando envío.")
+        return "error_saldo", None, None
 
 
 def finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id):
@@ -624,6 +682,9 @@ def finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, r
 
     if estado_prep == "esperando_respuesta":
         return "esperando_respuesta", None
+
+    if estado_prep == "error_saldo":
+        return "error_saldo", None
 
     ahora = time.time()
     with PREGUNTAS_LOCK:
@@ -743,6 +804,42 @@ def atender(rep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, hi
     return finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, respuestas_map, historial_por_id)
 
 
+def verificar_saldo_api(api_key):
+    """Verifica si la API tiene saldo disponible antes de procesar reportes."""
+    g_key = cfg("GEMINI_API_KEY") or (api_key if api_key and (api_key.startswith("AQ.") or api_key.startswith("AIza")) else None)
+    if g_key:
+        try:
+            payload = {
+                "contents": [{"parts": [{"text": "ping"}]}],
+                "generationConfig": {"maxOutputTokens": 1}
+            }
+            res = ejecutar_solicitud_gemini(payload, g_key, model="gemini-flash-latest", max_reintentos=1)
+            if res and "candidates" in res:
+                return True, "Gemini OK"
+            return False, "Gemini no devolvió respuesta"
+        except SaldoAgotadoError as e:
+            return False, str(e)
+        except Exception as e:
+            return True, f"Error temporal Gemini: {e}"
+
+    o_key = cfg("API_OPEN_ROUTER")
+    if o_key:
+        try:
+            payload = {
+                "model": "openai/gpt-4o-mini",
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "ping"}]
+            }
+            ejecutar_solicitud_openrouter(payload, o_key, max_reintentos=1)
+            return True, "OpenRouter OK"
+        except SaldoAgotadoError as e:
+            return False, str(e)
+        except Exception as e:
+            return True, f"Error temporal: {e}"
+
+    return False, "No hay API_KEY configurada (GEMINI_API_KEY ni API_OPEN_ROUTER)"
+
+
 def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial_por_id):
     reportes = api("GET", "/reportes")
 
@@ -773,6 +870,13 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
         nuevas_plagas, nuevas_parcelas = cargar_catalogos()
         plagas.update(nuevas_plagas)
         parcelas.update(nuevas_parcelas)
+
+    # Circuit Breaker: si hay reportes pendientes y la API no tiene saldo, BLOQUEAR envíos inmediatamente
+    ok_saldo, msg_saldo = verificar_saldo_api(API_KEY)
+    if not ok_saldo:
+        log(f"🚨 [CIRCUIT BREAKER ACTIVADO] La API de IA NO TIENE SALDO: {msg_saldo}")
+        log("⛔ [ENVÍO BLOQUEADO] NO se enviará ningún reporte a POST /casos para proteger los puntos del equipo.")
+        return 0
 
     log(f"{len(pendientes)} reporte(s) en seguimiento")
     t0 = time.time()
@@ -820,6 +924,8 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
             elif estado == "esperando_respuesta":
                 # Sigue pendiente de respuesta del productor
                 pass
+            elif estado == "error_saldo":
+                log(f"🚨 [CIRCUIT BREAKER] {rep_id} omitido en este ciclo por saldo/cuota agotada en la API.")
             else:
                 hechos.add(rep_id)
                 procesados += 1
