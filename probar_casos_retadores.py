@@ -1,13 +1,17 @@
 import json
 from interprete import interpretar_mensaje_texto
 
+import os
+
 env_vars = {}
-with open("/home/missa/Desktop/form-DIMA-2026/.env") as f:
-    for line in f:
-        line = line.strip()
-        if not line or line.startswith("#"): continue
-        k, _, v = line.partition("=")
-        env_vars[k.strip()] = v.strip().strip("'\"")
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.exists(env_path):
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"): continue
+            k, _, v = line.partition("=")
+            env_vars[k.strip()] = v.strip().strip("'\"")
 
 api_key = env_vars.get("API_OPEN_ROUTER")
 
