@@ -39,6 +39,7 @@ from interprete import (
     SaldoAgotadoError,
     ejecutar_solicitud_gemini,
     ejecutar_solicitud_openrouter,
+    contiene_sintomas_plaga,
 )
 
 INTERVALO = 8       # segundos entre consultas a /reportes
@@ -188,6 +189,47 @@ def guardar_caso_historial(historial_por_id, caso, persistir=True):
                     json.dump(nuevos, f, ensure_ascii=False, indent=2)
             except Exception as e:
                 log(f"Aviso: no se pudo guardar {ruta_h}: {e}")
+
+
+def enriquecer_historial_con_respuestas(historial_por_id, reportes, plagas, parcelas):
+    """Enriquece el historial epidemiológico con plagas confirmadas en respuestas de productores (respuesta_a)."""
+    respuestas_map = {r["respuesta_a"]: r for r in reportes if r.get("respuesta_a")}
+    reportes_por_id = {r["id"]: r for r in reportes}
+
+    for ref_id, resp in respuestas_map.items():
+        orig = reportes_por_id.get(ref_id)
+        if not orig:
+            continue
+        pid = orig.get("parcela_id") or resp.get("parcela_id")
+        parcela = parcelas.get(pid) if pid else None
+        cultivo = parcela["cultivo"] if parcela else None
+
+        curr = historial_por_id.get(ref_id)
+        if curr and curr.get("plaga") and curr["plaga"] != "desconocida":
+            continue
+
+        texto_resp = (resp.get("texto") or "").strip()
+        if not texto_resp:
+            continue
+
+        try:
+            ia_resp = interpretar_mensaje_texto(texto_resp, {"cultivo": cultivo, "caso_previo_activo": False})
+            if ia_resp.get("es_plaga") and ia_resp.get("plaga") and ia_resp["plaga"] != "desconocida":
+                lat = orig.get("lat") or (parcela["lat"] if parcela else None)
+                lon = orig.get("lon") or (parcela["lon"] if parcela else None)
+                if lat and lon:
+                    caso_enriquecido = {
+                        "reporte_id": ref_id,
+                        "parcela_id": pid,
+                        "lat": float(lat),
+                        "lon": float(lon),
+                        "plaga": ia_resp["plaga"],
+                        "recibido": orig.get("recibido") or resp.get("recibido"),
+                    }
+                    guardar_caso_historial(historial_por_id, caso_enriquecido, persistir=True)
+                    log(f"Historial epidemiológico enriquecido con respuesta: {ref_id} -> {ia_resp['plaga']}")
+        except Exception:
+            pass
 
 
 def cargar_preguntas_activas():
@@ -578,13 +620,18 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
                 ia["plaga"] = "desconocida"
                 ia["confianza"] = "baja"
 
-    # Si falta información clave (parcela desconocida o plaga desconocida en reporte nuevo),
+    # Si falta información clave (parcela desconocida, plaga desconocida o daño vago sin porcentaje ni síntomas específicos),
     # señalizar 'necesita_pregunta' para enviar pregunta antes de registrar
+    sintomas_especificos = ia.get("tiene_sintoma_especifico", True) and contiene_sintomas_plaga(texto or "")
+    pct_mencionado = bool(re.search(r"(\d+\s*%|\b(?:mitad|cuart\w*|terci\w*|tod\w*|por\s*ciento)\b)", texto or "", re.IGNORECASE))
+    es_vago = not sintomas_especificos and not pct_mencionado and not foto and ia.get("confianza") != "alta"
+
     necesita_pregunta = (
         not ia.get("es_seguimiento")
-        and (parcela is None or plaga_id == "desconocida")
+        and (parcela is None or plaga_id == "desconocida" or es_vago)
     )
     ia["necesita_pregunta"] = necesita_pregunta
+    ia["es_vago"] = es_vago
 
     # Plaga no identificada o parcela desconocida: no abre caso (sin semáforo ni técnico).
     if plaga is None or parcela is None or plaga_id == "desconocida":
@@ -698,8 +745,10 @@ def finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, r
             pregunta_txt = "¿En cuál de sus parcelas se ubica el cultivo afectado y qué síntomas específicos observa en las hojas, cogollo, fruto o raíz?"
         elif falta_parcela:
             pregunta_txt = "¿En cuál de sus parcelas se ubica este cultivo afectado?"
-        else:
+        elif falta_plaga:
             pregunta_txt = "¿Qué síntomas específicos observa en las hojas, cogollo, fruto o raíz?"
+        else:
+            pregunta_txt = "¿Qué síntomas específicos observa en las plantas y qué porcentaje aproximado de la parcela u hojas observa afectado?"
 
         estado_preg = enviar_pregunta(rep_id, pregunta_txt)
         if estado_preg in ("enviada", "ya_enviada"):
@@ -842,6 +891,9 @@ def verificar_saldo_api(api_key):
 
 def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial_por_id):
     reportes = api("GET", "/reportes")
+
+    # Enriquecer historial epidemiológico con respuestas de productores para garantizar brotes exactos
+    enriquecer_historial_con_respuestas(historial_por_id, reportes, plagas, parcelas)
 
     # Mapear respuestas de productores asociadas a reportes previos (en orden cronológico)
     respuestas_map = {}

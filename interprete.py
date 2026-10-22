@@ -1003,7 +1003,8 @@ def _asignar_plaga_unica_si_aplica(res, txt, cultivo_norm, foto_bytes):
     t = (txt or "").lower()
 
     # Salvaguarda R2: Exigir evidencia positiva de daño o afección vegetal
-    tiene_dano = bool(foto_bytes) or contiene_sintomas_plaga(t) or bool(DANO_VAGO_RE.search(t))
+    tiene_sintoma_real = bool(foto_bytes) or contiene_sintomas_plaga(t)
+    tiene_dano = tiene_sintoma_real or bool(DANO_VAGO_RE.search(t))
     if not tiene_dano:
         # Sin síntomas de daño o afección: preservar 'desconocida' defensivamente
         return res
@@ -1015,7 +1016,8 @@ def _asignar_plaga_unica_si_aplica(res, txt, cultivo_norm, foto_bytes):
 
     res = dict(res)
     res["plaga"] = unica
-    res["confianza"] = "media"
+    res["confianza"] = "alta" if tiene_sintoma_real else "media"
+    res["tiene_sintoma_especifico"] = tiene_sintoma_real
     res["razon"] = (res.get("razon") or "") + f" | Cultivo monohuésped {cultivo_norm}: única plaga posible {unica}"
     return res
 
