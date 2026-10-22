@@ -36,8 +36,8 @@ from clasificador import (
 from interprete import interpretar_mensaje_texto, transcribir_audio
 
 INTERVALO = 8       # segundos entre consultas a /reportes
-HILOS = 6           # reportes procesados en paralelo
-MAX_INTENTOS = 4    # intentos por reporte antes de darlo por fallido
+HILOS = 4           # reportes procesados en paralelo (cuidando rate limit)
+MAX_INTENTOS = 10   # intentos por reporte antes de activar salvaguarda determinista
 TIMEOUT_PREGUNTA_S = 300  # segundos a esperar respuesta del productor antes de registrar como desconocido
 AQUI = os.path.dirname(os.path.abspath(__file__))
 RUTA_HISTORIAL = os.path.join(AQUI, "casos_historial.json")
@@ -101,7 +101,8 @@ def api(metodo, ruta, datos=None, timeout=30):
 
 
 def descargar(url_relativa):
-    with urllib.request.urlopen(API_BASE + url_relativa, timeout=30) as r:
+    req = urllib.request.Request(API_BASE + url_relativa, headers={"X-Equipo-Token": TOKEN})
+    with urllib.request.urlopen(req, timeout=30) as r:
         return r.read()
 
 
@@ -459,13 +460,25 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
     parcela = parcelas.get(parcela_id or "")
     cultivo = parcela["cultivo"] if parcela else None
 
-    # Verificar si esta parcela ya tiene un reporte o caso previo registrado en el historial
+    # Verificar si esta parcela ya tiene un caso activo abierto en el periodo del hackathon
     tiene_caso_activo = False
-    with HISTORIAL_LOCK:
-        for c in (historial_por_id or {}).values():
-            if c.get("parcela_id") == parcela_id and c.get("reporte_id") != rep_id:
-                tiene_caso_activo = True
-                break
+    if parcela_id:
+        try:
+            t_actual = datetime.fromisoformat(rep["recibido"])
+        except Exception:
+            t_actual = datetime.now()
+        with HISTORIAL_LOCK:
+            for c in (historial_por_id or {}).values():
+                if c.get("parcela_id") == parcela_id and c.get("reporte_id") != rep_id:
+                    if str(c.get("reporte_id", "")).startswith("R-2"):
+                        try:
+                            t_prev = datetime.fromisoformat(c["recibido"])
+                            if t_actual >= t_prev and (t_actual - t_prev).total_seconds() <= 86400 * 3:
+                                tiene_caso_activo = True
+                                break
+                        except Exception:
+                            tiene_caso_activo = True
+                            break
 
     texto = (rep.get("texto") or "") + texto_adicional
     if not texto.strip():
@@ -495,6 +508,22 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
         plaga_id = "desconocida"
         ia["plaga"] = "desconocida"
 
+    # Restricción biológica obligatoria del catálogo oficial
+    from interprete import PLAGAS_POR_CULTIVO
+    cultivo_norm = (cultivo or "").strip().lower()
+    if cultivo_norm and cultivo_norm in PLAGAS_POR_CULTIVO:
+        permitidas = PLAGAS_POR_CULTIVO[cultivo_norm]
+        if plaga_id != "desconocida" and plaga_id not in permitidas:
+            log(f"Aviso [{rep_id}]: plaga {plaga_id} incompatible con cultivo {cultivo_norm}. Ajustando...")
+            if len(permitidas) == 1:
+                plaga_id = permitidas[0]
+                plaga = plagas.get(plaga_id)
+                ia["plaga"] = plaga_id
+            else:
+                plaga_id = "desconocida"
+                plaga = None
+                ia["plaga"] = "desconocida"
+
     # Si falta información clave (parcela desconocida o plaga desconocida en reporte nuevo),
     # señalizar 'necesita_pregunta' para enviar pregunta antes de registrar
     necesita_pregunta = (
@@ -504,7 +533,7 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
     ia["necesita_pregunta"] = necesita_pregunta
 
     # Plaga no identificada o parcela desconocida: no abre caso (sin semáforo ni técnico).
-    if plaga is None or parcela is None:
+    if plaga is None or parcela is None or plaga_id == "desconocida":
         return {"reporte_id": rep_id, "es_plaga": True, "plaga": "desconocida"}, ia
 
     pct = ia.get("pct")
@@ -603,8 +632,22 @@ def finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, r
                 rep["recibido"],
             )
 
+        # Siempre realizar validación previa con POST /casos/validar antes de registrar
+        try:
+            val_res = api("POST", "/casos/validar", payload)
+        except Exception as e:
+            log(f"CRÍTICO: error al contactar /casos/validar para {rep_id}: {e}")
+            raise
+
+        if val_res.get("ya_registrado_antes"):
+            log(f"{rep_id} ya estaba registrado antes según /casos/validar. Omitiendo.")
+            return "omitido", {"payload": payload, "api": val_res}
+
+        if not val_res.get("ok"):
+            log(f"CRÍTICO: /casos/validar rechazó payload de {rep_id}: {val_res}")
+            raise RuntimeError(f"Payload inválido para {rep_id}: {val_res}")
+
         if prueba:
-            res = api("POST", "/casos/validar", payload)
             if abre_caso:
                 guardar_caso_historial(historial_por_id, {
                     "reporte_id": rep_id,
@@ -618,7 +661,7 @@ def finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, r
                     "tecnico_id": payload.get("tecnico_id"),
                     "brote": payload.get("brote"),
                 }, persistir=False)
-            return "ok", {"payload": payload, "api": res, "razon": ia.get("razon")}
+            return "ok", {"payload": payload, "api": val_res, "razon": ia.get("razon")}
 
         res = api("POST", "/casos", payload)
         if abre_caso:
@@ -704,6 +747,23 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
             except Exception as e:  # red, IA o API: se reintenta en el siguiente ciclo
                 fallos[rep_id] = fallos.get(rep_id, 0) + 1
                 log(f"{rep_id} ({rep.get('tipo')}) ERROR intento {fallos[rep_id]}/{MAX_INTENTOS}: {e}")
+                if fallos[rep_id] >= MAX_INTENTOS and not prueba:
+                    log(f"ADVERTENCIA: {rep_id} agotó {MAX_INTENTOS} intentos. Activando salvaguarda determinista...")
+                    try:
+                        from interprete import clasificar_heuristico
+                        cultivo_parc = parcelas.get(rep.get("parcela_id") or "", {}).get("cultivo")
+                        ia_safe = clasificar_heuristico(rep.get("texto"), cultivo_parc)
+                        if not ia_safe.get("es_plaga"):
+                            payload_safe = {"reporte_id": rep_id, "es_plaga": False}
+                        else:
+                            payload_safe = {"reporte_id": rep_id, "es_plaga": True, "plaga": "desconocida"}
+                        val_s = api("POST", "/casos/validar", payload_safe)
+                        if val_s.get("ok") and not val_s.get("ya_registrado_antes"):
+                            reg_s = api("POST", "/casos", payload_safe)
+                            log(f"{rep_id} registrado exitosamente con salvaguarda determinista: {reg_s}")
+                        hechos.add(rep_id)
+                    except Exception as err_s:
+                        log(f"Fallo en salvaguarda determinista de {rep_id}: {err_s}")
                 continue
 
             if estado == "omitido":
