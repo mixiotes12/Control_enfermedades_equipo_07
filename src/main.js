@@ -347,6 +347,24 @@ let circuloDanio = null;
 let puntoDanioActual = null;
 let pctDanioActual = 10;
 const puntosDanioPorParcela = new Map();
+const pctDanioPorParcela = new Map();
+
+function limitarPuntoAParcela(lat, lon, parcela) {
+  if (!parcela) return [Number(lat), Number(lon)];
+  const ladoMetros = Math.sqrt(Number(parcela.superficie_ha) * 10000);
+  const deltaLat = ladoMetros / 111320 / 2;
+  const deltaLon = ladoMetros / (111320 * Math.cos((Number(parcela.lat) * Math.PI) / 180)) / 2;
+
+  const latMin = Number(parcela.lat) - deltaLat;
+  const latMax = Number(parcela.lat) + deltaLat;
+  const lonMin = Number(parcela.lon) - deltaLon;
+  const lonMax = Number(parcela.lon) + deltaLon;
+
+  const latClamped = Math.max(latMin, Math.min(latMax, Number(lat)));
+  const lonClamped = Math.max(lonMin, Math.min(lonMax, Number(lon)));
+  return [latClamped, lonClamped];
+}
+
 
 
 // ============================================================================
@@ -468,6 +486,12 @@ function cambiarVista(nuevaVista, actualizarHistorial = true) {
       }
     }
   }, 120);
+
+  setTimeout(() => {
+    if (nuevaVista === "agricultor" && mapAgricultor) {
+      mapAgricultor.invalidateSize();
+    }
+  }, 380);
 }
 
 window.addEventListener("popstate", () => {
@@ -681,11 +705,48 @@ function inicializarEventosAuth() {
     } catch {}
     chatHistorialParcelas.clear();
     puntosDanioPorParcela.clear();
+    pctDanioPorParcela.clear();
+    estadoApp.productorActualId = null;
+    estadoApp.parcelaActual = null;
+    puntoDanioActual = null;
+    pctDanioActual = 10;
+
+    // Limpiar capas del mapa del agricultor
+    if (marcadorDanio && mapAgricultor) {
+      try { mapAgricultor.removeLayer(marcadorDanio); } catch {}
+      marcadorDanio = null;
+    }
+    if (circuloDanio && mapAgricultor) {
+      try { mapAgricultor.removeLayer(circuloDanio); } catch {}
+      circuloDanio = null;
+    }
+    if (poligonoParcela && mapAgricultor) {
+      try { mapAgricultor.removeLayer(poligonoParcela); } catch {}
+      poligonoParcela = null;
+    }
+
+    // Limpiar adjuntos y grabación en curso si existía
+    limpiarAdjuntosChat();
+    if (grabacionActiva) {
+      grabacionCancelada = true;
+      if (grabacionTimer) clearInterval(grabacionTimer);
+      grabacionActiva = false;
+      document.querySelector("#chat-grabando-banner")?.classList.add("oculto");
+    }
+
+    const feed = document.querySelector("#chat-mensajes");
+    if (feed) feed.innerHTML = "";
+    const tabs = document.querySelector("#agr-parcelas-tabs");
+    if (tabs) tabs.innerHTML = "";
+    const statusBox = document.querySelector("#agr-visita-status");
+    if (statusBox) statusBox.innerHTML = "";
+
     actualizarBadgeSesion(null);
     document.querySelector("#nav-coordinador")?.classList.add("oculto");
     cambiarVista("landing");
     mostrarToast("🚪 Sesión cerrada correctamente");
   });
+
 }
 
 // ============================================================================
@@ -1343,23 +1404,51 @@ function actualizarBannerVisitaParcela(parcelaId) {
   const casoActivo = estadoApp.casosHistorial.find((c) => c.parcela_id === parcelaId);
   const p = mapaParcelas.get(parcelaId);
 
+  // Buscar avisos oficiales críticos para esta parcela o su productor
+  const prodId = estadoApp.productorActualId;
+  const avisoDeParcela = estadoApp.avisos.find((a) => {
+    const esCritico = a.tipo === "brote" || a.tipo === "cuarentenaria";
+    return esCritico && a.mensaje?.includes(parcelaId);
+  });
+  const avisoCritico = avisoDeParcela || estadoApp.avisos.find((a) => {
+    const esCritico = a.tipo === "brote" || a.tipo === "cuarentenaria";
+    const esDeProductor = Array.isArray(a.para) && prodId && a.para.includes(prodId);
+    return esCritico && esDeProductor;
+  });
+
   if (casoActivo && p) {
     const tec = mapaTecnicos.get(casoActivo.tecnico_id);
-    const tiempoVisita = casoActivo.prioridad >= 85 ? "menos de 24 horas" : casoActivo.prioridad >= 70 ? "menos de 48 horas" : "menos de 72 horas";
+    const prioridadNum = Number(casoActivo.prioridad) || 50;
+    const tiempoVisita = prioridadNum >= 85 ? "menos de 24 horas" : prioridadNum >= 70 ? "menos de 48 horas" : "menos de 72 horas";
+    const sem = (casoActivo.semaforo || "amarillo").toUpperCase();
     box.innerHTML = `
       <div class="visita-card visita-activa">
         <div class="visita-icon">📅</div>
         <div class="visita-content">
           <div class="visita-top">
-            <span class="badge-visita-urgente">VISITA TÉCNICA PROGRAMADA · FOLIO ${casoActivo.reporte_id}</span>
+            <span class="badge-visita-urgente">VISITA TÉCNICA PROGRAMADA · FOLIO ${escaparHtml(casoActivo.reporte_id || "")}</span>
             <span class="visita-tiempo">⏱️ Tiempo estimado: ${tiempoVisita}</span>
           </div>
-          <h4>${nombreLegiblePlaga(casoActivo.plaga)} en cultivo de ${p.cultivo} · Semáforo ${casoActivo.semaforo.toUpperCase()} (${casoActivo.prioridad} pts)</h4>
+          <h4>${escaparHtml(nombreLegiblePlaga(casoActivo.plaga))} en cultivo de ${escaparHtml(p.cultivo)} · Semáforo ${sem} (${prioridadNum} pts)</h4>
           <p>
-            Atención prioritaria asignada a <strong>${tec ? `${tec.nombre} (${tec.especialidad} · Base ${tec.base})` : "Técnico especialista de la Junta Local"}</strong>.
+            Atención prioritaria asignada a <strong>${tec ? `${escaparHtml(tec.nombre)} (${escaparHtml(tec.especialidad)} · Base ${escaparHtml(tec.base)})` : "Técnico especialista de la Junta Local"}</strong>.
             ${casoActivo.brote ? " · ⚠️ <b>Alerta de Brote Zonal activa</b>." : ""}
             Favor de mantener libre acceso al predio.
           </p>
+          ${avisoCritico ? `<div style="margin-top:8px; padding:6px 10px; background:rgba(239,68,68,0.18); border-left:3px solid #ef4444; border-radius:4px; font-size:12px; color:#fca5a5;"><strong>📢 Aviso Oficial Directo:</strong> ${escaparHtml(avisoCritico.mensaje)}</div>` : ""}
+        </div>
+      </div>
+    `;
+  } else if (avisoCritico && p) {
+    box.innerHTML = `
+      <div class="visita-card visita-activa" style="border-color: #f59e0b;">
+        <div class="visita-icon">⚠️</div>
+        <div class="visita-content">
+          <div class="visita-top">
+            <span class="badge-visita-urgente" style="background:#f59e0b;">AVISO FITOSANITARIO CRÍTICO EN ZONA</span>
+          </div>
+          <h4>Alerta Sanitaria en la cercanía de Parcela ${escaparHtml(p.id)}</h4>
+          <p>${escaparHtml(avisoCritico.mensaje)}</p>
         </div>
       </div>
     `;
@@ -1383,6 +1472,9 @@ function actualizarBannerVisitaParcela(parcelaId) {
 function actualizarMarcadorDanio(coords, pct) {
   pctDanioActual = Math.max(1, Math.min(100, Number(pct) || 10));
   const p = estadoApp.parcelaActual;
+  if (p) {
+    pctDanioPorParcela.set(p.id, pctDanioActual);
+  }
   const supTotal = Number(p?.superficie_ha) || 1;
   const haDanadas = (supTotal * pctDanioActual) / 100;
 
@@ -1409,7 +1501,7 @@ function actualizarMarcadorDanio(coords, pct) {
 
   if (!coords || !mapAgricultor) return;
 
-  // Actualizar o crear marcador visual de afección
+  // Actualizar o crear marcador visual de afección (interactive: false para delegar taps directo al polígono)
   if (marcadorDanio) {
     marcadorDanio.setLatLng(coords);
   } else {
@@ -1424,7 +1516,7 @@ function actualizarMarcadorDanio(coords, pct) {
       iconSize: [32, 32],
       iconAnchor: [16, 16],
     });
-    marcadorDanio = L.marker(coords, { icon: pinIcon }).addTo(mapAgricultor);
+    marcadorDanio = L.marker(coords, { icon: pinIcon, interactive: false }).addTo(mapAgricultor);
   }
 
   // Radio del círculo en metros basado en hectáreas afectadas
@@ -1441,6 +1533,7 @@ function actualizarMarcadorDanio(coords, pct) {
       dashArray: "4, 4",
       fillColor: "#f87171",
       fillOpacity: 0.38,
+      interactive: false,
     }).addTo(mapAgricultor);
   }
 }
@@ -1502,24 +1595,34 @@ function seleccionarParcelaAgricultor(parcelaId) {
 
   poligonoParcela.on("click", (e) => {
     if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
-    puntoDanioActual = [e.latlng.lat, e.latlng.lng];
+    const [cLat, cLon] = limitarPuntoAParcela(e.latlng.lat, e.latlng.lng, p);
+    puntoDanioActual = [cLat, cLon];
     puntosDanioPorParcela.set(p.id, puntoDanioActual);
     actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
     mostrarToast(`📍 Foco de afección marcado en la parcela (${pctDanioActual}%)`);
   });
 
-  // Colocar o recuperar foco de daño en la parcela
+  // Colocar o recuperar foco de daño y porcentaje específico de la parcela
   if (puntosDanioPorParcela.has(p.id)) {
     puntoDanioActual = puntosDanioPorParcela.get(p.id);
   } else {
     puntoDanioActual = [Number(p.lat), Number(p.lon)];
     puntosDanioPorParcela.set(p.id, puntoDanioActual);
   }
+
+  if (pctDanioPorParcela.has(p.id)) {
+    pctDanioActual = pctDanioPorParcela.get(p.id);
+  } else {
+    pctDanioActual = 10;
+    pctDanioPorParcela.set(p.id, pctDanioActual);
+  }
+
   actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
 
   // Inicializar o refrescar chat conversacional para esta parcela
   iniciarChatParaParcela(p);
 }
+
 
 // R1: Clasificador Inteligente de Síntomas del Asistente
 function diagnosticarReporteConversacional(mensajeTexto, tieneFoto, tieneAudio, pctManual) {
@@ -1617,7 +1720,7 @@ function diagnosticarReporteConversacional(mensajeTexto, tieneFoto, tieneAudio, 
       id: "hlb",
       nombre: "HLB (Dragón Amarillo)",
       cultivos: ["limon", "limón", "citricos", "cítricos"],
-      regex: /hlb|dragon|amarillo|enverdecim|motead|fruto.*deforme|asimetr/i,
+      regex: /hlb|huanglongbing|dragon.*amarill|enverdecim.*citric|fruto.*deforme.*citric/i,
       consejo: "¡Alerta Cuarentenaria! No traslades varetas ni material vegetativo fuera del predio.",
       descripcion: "Sintomatología coincidente con HLB/Dragón Amarillo, plaga bajo estricta vigilancia cuarentenaria oficial.",
     },
@@ -1635,7 +1738,17 @@ function diagnosticarReporteConversacional(mensajeTexto, tieneFoto, tieneAudio, 
   let reglaDetectada = null;
   let sintomaEncontrado = false;
 
-  for (const r of reglasPlagas) {
+  const cultivoP = (p?.cultivo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // 1. Priorizar reglas compatibles con el cultivo de la parcela
+  const reglasCompatibles = reglasPlagas.filter((r) =>
+    r.cultivos.some((c) => cultivoP.includes(c))
+  );
+  const otrasReglas = reglasPlagas.filter((r) =>
+    !r.cultivos.some((c) => cultivoP.includes(c))
+  );
+
+  for (const r of reglasCompatibles) {
     if (r.regex.test(textoNorm)) {
       reglaDetectada = r;
       plagaDetectada = mapaPlagas.get(r.id);
@@ -1644,11 +1757,30 @@ function diagnosticarReporteConversacional(mensajeTexto, tieneFoto, tieneAudio, 
     }
   }
 
-  const esSeguimiento = pideSeguimiento && !sintomaEncontrado;
+  if (!sintomaEncontrado) {
+    for (const r of otrasReglas) {
+      if (r.regex.test(textoNorm)) {
+        reglaDetectada = r;
+        plagaDetectada = mapaPlagas.get(r.id);
+        sintomaEncontrado = true;
+        break;
+      }
+    }
+  }
 
-  // Fallback según cultivo de la parcela si no se especificó síntoma directo
-  if (!plagaDetectada && p) {
-    const cultivoP = (p.cultivo || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // Detección de intenciones conversacionales
+  const esAgradecimiento = /(^|[^\wáéíóúñ])(muchas gracias|gracias|todo claro|perfecto|enterado|ok|vale|de acuerdo|muy amable|mil gracias)\b/i.test(textoNorm) && !sintomaEncontrado;
+  const esSeguimiento = pideSeguimiento && !sintomaEncontrado && !esAgradecimiento;
+  const esSaludo = /(^|[^\wáéíóúñ])(hola|buenos dias|buenas tardes|buenas noches|que tal|saludos|buen dia)\b/i.test(textoNorm) && !sintomaEncontrado && !esAgradecimiento && !esSeguimiento;
+  const esAyuda = /(^|[^\wáéíóúñ])(como funciona|que hago|ayuda|para que sirve|instrucciones|como uso|que puedo hacer)\b/i.test(textoNorm) && !sintomaEncontrado;
+  const esMapaGuia = /(^|[^\wáéíóúñ])(reubicar|mapa|mover foco|marcar foco|como marco|como ubico|ajustar foco|foco de dano)\b/i.test(textoNorm) && !sintomaEncontrado;
+  const esBuenEstado = /(^|[^\wáéíóúñ])(todo bien|sin plaga|plantas sanas|sin novedad|no hay plaga|todo en orden|no hay dano|sano|sanas)\b/i.test(textoNorm) && !sintomaEncontrado;
+
+  // Un reporte técnico es válido SI Y SOLO SI hay síntomas descritos o evidencia multimodal adjunta
+  const esReporteValido = sintomaEncontrado || Boolean(tieneFoto) || Boolean(tieneAudio);
+
+  // Fallback según cultivo de la parcela si es reporte válido (por foto o audio) sin síntoma textual
+  if (!plagaDetectada && esReporteValido && p) {
     if (cultivoP.includes("maiz")) {
       plagaDetectada = mapaPlagas.get("gusano_cogollero");
       reglaDetectada = reglasPlagas[0];
@@ -1664,19 +1796,28 @@ function diagnosticarReporteConversacional(mensajeTexto, tieneFoto, tieneAudio, 
     } else if (cultivoP.includes("limon") || cultivoP.includes("citric")) {
       plagaDetectada = mapaPlagas.get("hlb");
       reglaDetectada = reglasPlagas[8];
+    } else if (cultivoP.includes("avena") || cultivoP.includes("trigo") || cultivoP.includes("cebada")) {
+      plagaDetectada = mapaPlagas.get("pulgon");
+      reglaDetectada = reglasPlagas[2];
     } else {
       plagaDetectada = estadoApp.plagas[0] || null;
       reglaDetectada = reglasPlagas[0];
     }
   }
 
-  const calc = calcularPrioridadSemaforoDesglosado(plagaDetectada, p, pct);
-  const mejorTec = seleccionarTecnicoOptimo(plagaDetectada, p);
+  const calc = plagaDetectada ? calcularPrioridadSemaforoDesglosado(plagaDetectada, p, pct) : null;
+  const mejorTec = plagaDetectada ? seleccionarTecnicoOptimo(plagaDetectada, p) : null;
   const vecinosBrote = plagaDetectada && p ? buscarVecinosBrote(plagaDetectada.id, p.lat, p.lon) : [];
   const detonaBrote = vecinosBrote.length + 1 >= 3;
 
   return {
+    esReporteValido,
+    esAgradecimiento,
     esSeguimiento,
+    esSaludo,
+    esAyuda,
+    esMapaGuia,
+    esBuenEstado,
     plaga: plagaDetectada,
     regla: reglaDetectada,
     pct,
@@ -1799,18 +1940,61 @@ function crearElementoMensaje(m) {
   // Listener para los chips de sugerencia rápida
   div.querySelectorAll(".quick-chip-btn").forEach((chip) => {
     chip.addEventListener("click", () => {
+      const chipRaw = chip.textContent.trim();
+      const chipNorm = chipRaw.toLowerCase();
       const txtInput = document.querySelector("#chat-input-texto");
+
+      // Chip de foto: abrir de inmediato el selector/cámara
+      if (chipNorm.includes("foto") || chipNorm.includes("fotografía")) {
+        const fileInput = document.querySelector("#chat-file-input");
+        if (fileInput) {
+          fileInput.value = "";
+          fileInput.click();
+        }
+        return;
+      }
+
+      // Chip de mapa: scroll suave al lienzo satelital y toast guía
+      if (chipNorm.includes("mapa") || chipNorm.includes("reubicar")) {
+        const mapEl = document.querySelector("#mapa");
+        if (mapEl) {
+          mapEl.scrollIntoView({ behavior: "smooth", block: "center" });
+          mostrarToast("📍 Toca directamente sobre tu parcela en el mapa para marcar el foco del daño");
+        }
+        return;
+      }
+
       if (txtInput) {
-        txtInput.value = chip.textContent.replace(/^[^\wáéíóúÁÉÍÓÚ¿?]+/, "").trim();
+        txtInput.value = chipRaw.replace(/^[^\wáéíóúÁÉÍÓÚ¿?]+/, "").trim();
+        txtInput.style.height = "auto";
+        txtInput.style.height = `${Math.min(120, txtInput.scrollHeight)}px`;
+        txtInput.dispatchEvent(new Event("input"));
         txtInput.focus();
       }
     });
   });
 
-  // Listener para ampliar fotos de evidencia en nueva pestaña
+  // Listener para ampliar fotos de evidencia en nueva ventana de forma segura (sin bloqueo por data-url en Chromium)
   div.querySelectorAll(".chat-media-preview-bubble img").forEach((img) => {
     img.addEventListener("click", () => {
-      window.open(img.src, "_blank");
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.title = "Evidencia Fotográfica - Alerta Plaga";
+        w.document.body.style.margin = "0";
+        w.document.body.style.backgroundColor = "#0b1320";
+        w.document.body.style.display = "flex";
+        w.document.body.style.alignItems = "center";
+        w.document.body.style.justifyContent = "center";
+        w.document.body.style.minHeight = "100vh";
+        const im = w.document.createElement("img");
+        im.src = img.src;
+        im.style.maxWidth = "96%";
+        im.style.maxHeight = "96vh";
+        im.style.objectFit = "contain";
+        im.style.borderRadius = "8px";
+        im.style.boxShadow = "0 8px 30px rgba(0,0,0,0.8)";
+        w.document.body.appendChild(im);
+      }
     });
   });
 
@@ -1862,11 +2046,7 @@ async function procesarEnvioChat(textoMensaje) {
     let textoRespuesta = "";
     let reporteCard = null;
 
-    if (diag.esSeguimiento) {
-      const casoActivo = estadoApp.casosHistorial.find((c) => c.parcela_id === p.id);
-      const tec = casoActivo ? mapaTecnicos.get(casoActivo.tecnico_id) : diag.tecnico;
-      textoRespuesta = `He consultado el estado de tu reporte en sistema. Tu parcela <strong>${escaparHtml(p.id)}</strong> tiene programada la inspección con el <strong>${tec ? `${tec.nombre} (${tec.especialidad})` : "técnico de campo"}</strong>. Si notas un incremento en la zona dañada o nuevos síntomas, mantén el área delimitada en el mapa satelital.`;
-    } else {
+    if (diag.esReporteValido) {
       const plagaObj = diag.plaga || { id: "plaga_campo", nombre: "Afección fitosanitaria" };
       const reglaObj = diag.regla || {
         descripcion: "Monitoreo preventivo de síntomas foliares",
@@ -1903,29 +2083,91 @@ async function procesarEnvioChat(textoMensaje) {
       };
       await guardarEntradaBitacora(nuevaEntrada);
 
+      // Usar coordenadas precisas del foco marcado por el agricultor
+      const coordsFoco = puntoDanioActual ? puntoDanioActual : [Number(p.lat), Number(p.lon)];
+
       // Agregar a casosHistorial en memoria
       estadoApp.casosHistorial.unshift({
         reporte_id: folioNuevo,
         recibido: new Date().toISOString(),
         parcela_id: p.id,
         plaga: plagaObj.id,
-        lat: p.lat,
-        lon: p.lon,
+        lat: coordsFoco[0],
+        lon: coordsFoco[1],
         semaforo: semaforoVal,
         prioridad: prioridadVal,
         tecnico_id: diag.tecnico?.id || null,
         brote: diag.brote,
       });
 
+      // Registrar aviso oficial en buzón
+      estadoApp.avisos.unshift({
+        id: Date.now(),
+        equipo_id: "equipo07",
+        reporte_id: folioNuevo,
+        tipo: diag.brote ? "brote" : "folio",
+        para: [estadoApp.productorActualId || "PR-101", "coordinador"],
+        mensaje: `Reporte ${folioNuevo} registrado en parcela ${p.id} (${plagaObj.nombre}, semáforo ${semaforoVal}). Prioridad: ${prioridadVal} pts.`,
+        creado: new Date().toISOString(),
+      });
+
       renderizarKPIs();
       actualizarVistaTecnico();
       actualizarBannerVisitaParcela(p.id);
+      renderizarFeedAvisosOficiales();
+
+      mostrarToast(`🚀 Reporte ${folioNuevo} emitido exitosamente`);
+    } else if (diag.esAgradecimiento) {
+      textoRespuesta = `¡Con mucho gusto! 🌱 Estamos para respaldarte a ti y a tu cultivo. Si notas cualquier cambio o síntoma nuevo en tus plantas, aquí estoy disponible las 24 horas. ¡Que tengas una excelente jornada en el campo! 🌾`;
+    } else if (diag.esSeguimiento) {
+      const casoActivo = estadoApp.casosHistorial.find((c) => c.parcela_id === p.id);
+      if (casoActivo) {
+        const tec = mapaTecnicos.get(casoActivo.tecnico_id);
+        const prioridadNum = Number(casoActivo.prioridad) || 50;
+        const tiempoVisita = prioridadNum >= 85 ? "menos de 24 horas" : prioridadNum >= 70 ? "menos de 48 horas" : "menos de 72 horas";
+        textoRespuesta = `He consultado el estado de tu reporte <strong>${escaparHtml(casoActivo.reporte_id)}</strong>. Tu parcela <strong>${escaparHtml(p.id)}</strong> tiene programada la inspección con el <strong>${tec ? `${escaparHtml(tec.nombre)} (${escaparHtml(tec.especialidad)})` : "técnico de campo"}</strong> con plazo estimado de <strong>${tiempoVisita}</strong>. Si notas un incremento en la zona dañada o nuevos síntomas, mantén el área delimitada en el mapa satelital.`;
+      } else {
+        textoRespuesta = `He consultado los registros oficiales y tu parcela <strong>${escaparHtml(p.id)}</strong> se encuentra actualmente con estatus fitosanitario monitoreado y sin visitas técnicas pendientes. Si notas hojas perforadas, manchas o presencia de plagas, descríbelo aquí o envíame una foto/audio para programar una inspección de inmediato.`;
+      }
+      mostrarToast("ℹ️ Información de seguimiento actualizada");
+    } else if (diag.esSaludo) {
+      const sesion = cargarSesion();
+      const nombreProd = sesion?.nombre || "productor";
+      textoRespuesta = `¡Hola, don ${escaparHtml(nombreProd)}! 👋 ¿Cómo va el trabajo en el campo? Estoy atento para respaldarte en tu parcela <strong>${escaparHtml(p.id)}</strong> (${escaparHtml(p.cultivo)}). Si ves hojas mordidas, manchas o algún daño, cuéntamelo aquí o mándame una foto con 📷 o una nota de voz con 🎙️.`;
+    } else if (diag.esAyuda) {
+      textoRespuesta = `Es muy fácil reportar una afección en tu parcela: 🌾<br/><br/>
+1. <strong>Describe el problema:</strong> Escribe lo que observas (ej. hojas comidas o manchas), o usa el botón 📷 para foto o 🎙️ para audio.<br/>
+2. <strong>Ubica el daño:</strong> Toca tu parcela en el mapa satelital a la derecha para señalar el foco y ajusta el porcentaje estimado.<br/>
+3. <strong>Atención oficial:</strong> Recibirás folio oficial y se programará la visita del técnico especialista de tu zona.`;
+    } else if (diag.esMapaGuia) {
+      textoRespuesta = `📍 <strong>Delimitación en Mapa Satelital:</strong><br/>
+Para marcar la zona afectada, simplemente haz clic o toca sobre la superficie verde de tu parcela en el mapa satelital a la derecha. El pin de advertencia y el círculo rojo delimitarán el foco. También puedes ajustar el porcentaje con los botones rápidos (10%, 25%, 50%, 100%) o el deslizador.`;
+    } else if (diag.esBuenEstado) {
+      textoRespuesta = `¡Excelente noticia! 🌱 Nos alegra saber que tu cultivo de <strong>${escaparHtml(p.cultivo)}</strong> se encuentra sano y sin novedad. Mantén la vigilancia y avísame de inmediato si notas algún síntoma sospechoso.`;
+    } else {
+      textoRespuesta = `Para brindarte un diagnóstico fitosanitario certero y programar la visita técnica correspondiente en tu cultivo de <strong>${escaparHtml(p.cultivo)}</strong>, por favor descríbeme qué daño o insectos ves (ej. gusanos, polvillo, marchitez), o bien tómale una foto a la hoja con 📷 o mándame una nota de voz con 🎙️.`;
     }
+
+    const followUpChips = diag.esReporteValido
+      ? [
+          "📅 ¿Cuándo viene el técnico a revisar?",
+          "📸 Enviar otra foto de evidencia",
+          "📍 Reubicar foco de daño en mapa",
+          "✅ Todo claro, muchas gracias",
+        ]
+      : [
+          "🐛 Hojas comidas con gusano en cogollo",
+          "🍂 Manchas de polvo anaranjado en hojas",
+          "🌱 Planta marchita y raíces comidas",
+          "📸 Enviar foto de evidencia",
+          "📍 Reubicar foco de daño en mapa",
+        ];
 
     const msgBot = {
       remitente: "bot",
       texto: textoRespuesta,
       reporteCard,
+      chips: followUpChips,
       tiempo: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
@@ -1933,14 +2175,21 @@ async function procesarEnvioChat(textoMensaje) {
     chatHistorialParcelas.set(p.id, msgs);
     feed.appendChild(crearElementoMensaje(msgBot));
     feed.scrollTop = feed.scrollHeight;
-
-    mostrarToast(`🚀 Reporte ${folioNuevo} emitido exitosamente`);
   }, 850);
 }
 
 function limpiarAdjuntosChat() {
   fotoAdjuntaActual = null;
   audioAdjuntoActual = null;
+
+  const audioPlayer = document.querySelector("#adjunto-audio-player");
+  if (audioPlayer) {
+    try {
+      audioPlayer.pause();
+      audioPlayer.removeAttribute("src");
+      audioPlayer.load();
+    } catch {}
+  }
 
   const bar = document.querySelector("#chat-adjuntos-bar");
   const pFoto = document.querySelector("#adjunto-foto-preview");
@@ -1954,12 +2203,12 @@ function limpiarAdjuntosChat() {
 }
 
 function inicializarEventosPortalAgricultor() {
-  // Toque / Clic en el mapa satelital para ubicar el foco de daño
+  // Toque / Clic en el mapa satelital para ubicar el foco de daño (restringido a la parcela)
   mapAgricultor.on("click", (e) => {
-    puntoDanioActual = [e.latlng.lat, e.latlng.lng];
-    if (estadoApp.parcelaActual) {
-      puntosDanioPorParcela.set(estadoApp.parcelaActual.id, puntoDanioActual);
-    }
+    if (!estadoApp.parcelaActual) return;
+    const [cLat, cLon] = limitarPuntoAParcela(e.latlng.lat, e.latlng.lng, estadoApp.parcelaActual);
+    puntoDanioActual = [cLat, cLon];
+    puntosDanioPorParcela.set(estadoApp.parcelaActual.id, puntoDanioActual);
     actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
     mostrarToast(`📍 Foco de afección marcado en la parcela (${pctDanioActual}%)`);
   });
@@ -1970,6 +2219,9 @@ function inicializarEventosPortalAgricultor() {
       const pct = Number(btn.dataset.pct);
       if (pct) {
         pctDanioActual = pct;
+        if (estadoApp.parcelaActual) {
+          pctDanioPorParcela.set(estadoApp.parcelaActual.id, pctDanioActual);
+        }
         actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
       }
     });
@@ -1979,6 +2231,9 @@ function inicializarEventosPortalAgricultor() {
   const slider = document.querySelector("#mapa-slider-pct");
   slider?.addEventListener("input", (e) => {
     pctDanioActual = Number(e.target.value) || 10;
+    if (estadoApp.parcelaActual) {
+      pctDanioPorParcela.set(estadoApp.parcelaActual.id, pctDanioActual);
+    }
     actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
   });
 
@@ -1989,6 +2244,7 @@ function inicializarEventosPortalAgricultor() {
       puntoDanioActual = [Number(p.lat), Number(p.lon)];
       puntosDanioPorParcela.set(p.id, puntoDanioActual);
       pctDanioActual = 10;
+      pctDanioPorParcela.set(p.id, pctDanioActual);
       actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
 
       // Re-centrar vista del mapa en la parcela
@@ -2011,6 +2267,7 @@ function inicializarEventosPortalAgricultor() {
   // 2. Adjuntar Fotografía
   const fileInput = document.querySelector("#chat-file-input");
   document.querySelector("#btn-adjuntar-foto")?.addEventListener("click", () => {
+    if (fileInput) fileInput.value = "";
     fileInput?.click();
   });
 
@@ -2150,8 +2407,10 @@ function inicializarEventosPortalAgricultor() {
         mediaRecorder.start();
         return;
       } catch {
-        // En caso de que no tenga micrófono disponible o permisos denegados, corre simulación
+        mostrarToast("🎙️ Micrófono no disponible o sin permisos. Modo simulación de audio activo.");
       }
+    } else {
+      mostrarToast("🎙️ Dispositivo sin soporte de grabación directa. Simulación de nota de voz activa.");
     }
   });
 
@@ -2173,6 +2432,14 @@ function inicializarEventosPortalAgricultor() {
   });
 
   document.querySelector("#btn-remover-audio")?.addEventListener("click", () => {
+    const audioPlayer = document.querySelector("#adjunto-audio-player");
+    if (audioPlayer) {
+      try {
+        audioPlayer.pause();
+        audioPlayer.removeAttribute("src");
+        audioPlayer.load();
+      } catch {}
+    }
     audioAdjuntoActual = null;
     document.querySelector("#adjunto-audio-preview")?.classList.add("oculto");
     if (!fotoAdjuntaActual) {
@@ -2184,14 +2451,27 @@ function inicializarEventosPortalAgricultor() {
   const chatForm = document.querySelector("#chat-form");
   const chatInput = document.querySelector("#chat-input-texto");
 
+  // Auto-ajuste de altura del textarea al escribir
+  chatInput?.addEventListener("input", () => {
+    chatInput.style.height = "auto";
+    chatInput.style.height = `${Math.min(120, chatInput.scrollHeight)}px`;
+  });
+
   chatForm?.addEventListener("submit", (e) => {
     e.preventDefault();
+    if (grabacionActiva) {
+      mostrarToast("⚠️ Detén la grabación de audio (⏹️ Listo) antes de enviar");
+      return;
+    }
     const texto = chatInput?.value?.trim() || "";
     if (!texto && !fotoAdjuntaActual && !audioAdjuntoActual) {
       mostrarToast("⚠️ Escribe un mensaje o adjunta una foto/nota de voz");
       return;
     }
-    if (chatInput) chatInput.value = "";
+    if (chatInput) {
+      chatInput.value = "";
+      chatInput.style.height = "auto";
+    }
     procesarEnvioChat(texto);
   });
 
@@ -2345,16 +2625,61 @@ function renderizarTablasBitacora() {
   }
 }
 
+function guardarEnColaOffline(entrada) {
+  try {
+    const raw = localStorage.getItem("alerta_plaga_offline_cola");
+    const cola = raw ? JSON.parse(raw) : [];
+    cola.push(entrada);
+    localStorage.setItem("alerta_plaga_offline_cola", JSON.stringify(cola));
+  } catch {}
+}
+
+async function sincronizarColaOffline() {
+  try {
+    const raw = localStorage.getItem("alerta_plaga_offline_cola");
+    if (!raw) return;
+    const cola = JSON.parse(raw);
+    if (!Array.isArray(cola) || cola.length === 0) return;
+
+    const pendientes = [];
+    for (const item of cola) {
+      try {
+        const res = await fetch("/api/bitacora", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item),
+        });
+        if (!res.ok) pendientes.push(item);
+      } catch {
+        pendientes.push(item);
+      }
+    }
+
+    if (pendientes.length === 0) {
+      localStorage.removeItem("alerta_plaga_offline_cola");
+      mostrarToast("📶 Reportes guardados sin conexión sincronizados con éxito");
+    } else {
+      localStorage.setItem("alerta_plaga_offline_cola", JSON.stringify(pendientes));
+    }
+  } catch {}
+}
+
 async function guardarEntradaBitacora(entrada) {
   // Guardar en servidor (/api/bitacora)
+  let servidorOk = false;
   try {
-    await fetch("/api/bitacora", {
+    const res = await fetch("/api/bitacora", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(entrada),
     });
+    if (res.ok) servidorOk = true;
   } catch {
-    // Ignorar en modo estático puro
+    servidorOk = false;
+  }
+
+  if (!servidorOk) {
+    guardarEnColaOffline(entrada);
   }
 
   // Guardar en Supabase si está activo
@@ -2562,12 +2887,18 @@ async function sincronizarDatosEnVivo(mostrarNotificacion = false) {
         mostrarToast(`🔄 Sincronizado: ${estadoApp.casosHistorial.length} casos Nivel 2 activos`);
       }
     }
+    await sincronizarColaOffline();
   } catch {
     // En desarrollo estático usa datosSemilla sin fallar
   } finally {
     if (pill) setTimeout(() => pill.classList.remove("syncing"), 600);
   }
 }
+
+// Escuchar evento online para sincronizar cola offline de inmediato
+window.addEventListener("online", () => {
+  sincronizarColaOffline();
+});
 
 // Clic opcional en la pastilla para forzar refresco manual
 document.querySelector("#indicador-en-vivo")?.addEventListener("click", () => {
@@ -2613,5 +2944,15 @@ function iniciarPanel() {
     sincronizarDatosEnVivo(false);
   }, 10000);
 }
+
+// Redimensionamiento responsivo de lienzos Leaflet
+let debouncedResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(debouncedResizeTimer);
+  debouncedResizeTimer = setTimeout(() => {
+    if (mapAgricultor) mapAgricultor.invalidateSize();
+    if (mapTecnico) mapTecnico.invalidateSize();
+  }, 160);
+});
 
 iniciarPanel();

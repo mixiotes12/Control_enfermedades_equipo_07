@@ -458,6 +458,15 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
 
     parcela = parcelas.get(parcela_id or "")
     cultivo = parcela["cultivo"] if parcela else None
+
+    # Verificar si esta parcela ya tiene un reporte o caso previo registrado en el historial
+    tiene_caso_activo = False
+    with HISTORIAL_LOCK:
+        for c in (historial_por_id or {}).values():
+            if c.get("parcela_id") == parcela_id and c.get("reporte_id") != rep_id:
+                tiene_caso_activo = True
+                break
+
     texto = (rep.get("texto") or "") + texto_adicional
     if not texto.strip():
         texto = None
@@ -469,10 +478,16 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
     elif rep.get("tipo") == "foto" and rep.get("foto_url"):
         foto = descargar(rep["foto_url"])
 
-    ia = interpretar_mensaje_texto(texto=texto, cultivo_parcela=cultivo, api_key=API_KEY, foto_bytes=foto)
+    contexto_parcela = {"cultivo": cultivo, "caso_previo_activo": tiene_caso_activo}
+    ia = interpretar_mensaje_texto(texto=texto, cultivo_parcela=contexto_parcela, api_key=API_KEY, foto_bytes=foto)
 
     if not ia.get("es_plaga"):
         return {"reporte_id": rep_id, "es_plaga": False}, ia
+
+    # En seguimientos oficiales (Sección 6 y 9), NO se abre un caso nuevo: plaga DEBE ser 'desconocida'
+    if ia.get("es_seguimiento"):
+        ia["plaga"] = "desconocida"
+        return {"reporte_id": rep_id, "es_plaga": True, "plaga": "desconocida"}, ia
 
     plaga_id = ia.get("plaga") or "desconocida"
     plaga = plagas.get(plaga_id)
@@ -488,9 +503,9 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
     )
     ia["necesita_pregunta"] = necesita_pregunta
 
-    # Seguimiento, plaga no identificada o parcela desconocida: no abre caso (sin semáforo ni técnico).
-    if ia.get("es_seguimiento") or plaga is None or parcela is None:
-        return {"reporte_id": rep_id, "es_plaga": True, "plaga": "desconocida" if plaga is None else plaga_id}, ia
+    # Plaga no identificada o parcela desconocida: no abre caso (sin semáforo ni técnico).
+    if plaga is None or parcela is None:
+        return {"reporte_id": rep_id, "es_plaga": True, "plaga": "desconocida"}, ia
 
     pct = ia.get("pct")
     prioridad, semaforo = calcular_prioridad_y_semaforo(plaga, parcela, 10 if pct is None else pct)

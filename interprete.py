@@ -124,9 +124,14 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
     if not api_key:
         raise ValueError("Se requiere API_OPEN_ROUTER")
 
+    cultivo_val = cultivo_parcela.get("cultivo", "") if isinstance(cultivo_parcela, dict) else str(cultivo_parcela or "")
+    caso_previo = cultivo_parcela.get("caso_previo_activo", False) if isinstance(cultivo_parcela, dict) else False
+
     user_text = f"Mensaje del productor: \"{texto or 'Foto adjunta'}\""
-    if cultivo_parcela:
-        user_text += f"\nCultivo de la parcela: {cultivo_parcela}"
+    if cultivo_val:
+        user_text += f"\nCultivo de la parcela: {cultivo_val}"
+    if caso_previo:
+        user_text += "\nCONTEXTO: Esta parcela YA TIENE un caso fitosanitario activo reportado previamente. Si este mensaje es una actualización del avance del daño (ej. 'las matas se están secando', 'ya agarró más', 'se está pasando a más matas', 'sigue igual') o una consulta de visita, ES UN SEGUIMIENTO de ese caso (es_seguimiento: true, plaga: 'desconocida')."
 
     user_content = [{"type": "text", "text": user_text}]
 
@@ -171,9 +176,16 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
         if not parsed.get("es_plaga") and texto and SEGUIMIENTO_RE.search(texto):
             parsed.update({"es_plaga": True, "es_seguimiento": True, "plaga": "desconocida", "pct": 10})
 
-        # Regla Oficial Sección 6 y 9: Si es seguimiento y no trae plaga, 'desconocida' es correcto.
-        if parsed.get("es_seguimiento") and (not parsed.get("plaga") or parsed.get("plaga") == "null"):
+        # Regla Oficial Sección 6 y 9: Si es seguimiento, la plaga SIEMPRE es 'desconocida' (no abre caso nuevo)
+        if parsed.get("es_seguimiento"):
             parsed["plaga"] = "desconocida"
+
+        # Red de seguridad: si la parcela ya tiene caso activo y el texto describe evolución/avance sin nombrar plaga nueva
+        if caso_previo and parsed.get("es_plaga") and not parsed.get("es_seguimiento"):
+            texto_lower = (texto or "").lower()
+            if any(frase in texto_lower for frase in ["secando", "sigue igual", "ya agarró", "pasando a más", "están todas", "otra foto", "toda la parcela"]):
+                parsed["es_seguimiento"] = True
+                parsed["plaga"] = "desconocida"
 
         # Con baja confianza es mejor "desconocida" (0 puntos) que arriesgar plaga, semáforo y técnico (hasta -3).
         if parsed.get("es_plaga") and parsed.get("confianza") == "baja" and parsed.get("plaga") not in (None, "desconocida"):

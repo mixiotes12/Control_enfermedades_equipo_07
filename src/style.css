@@ -1831,6 +1831,7 @@ tbody tr:hover {
 /* Pin táctil de daño */
 .danio-pin-wrapper {
   position: relative;
+  pointer-events: none;
 }
 
 .danio-pin-core {
