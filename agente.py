@@ -192,45 +192,126 @@ def guardar_caso_historial(historial_por_id, caso, persistir=True):
                 log(f"Aviso: no se pudo guardar {ruta_h}: {e}")
 
 
-def enriquecer_historial_con_respuestas(historial_por_id, reportes, plagas, parcelas):
-    """Enriquece el historial epidemiológico con plagas confirmadas en respuestas de productores (respuesta_a)."""
-    respuestas_map = {r["respuesta_a"]: r for r in reportes if r.get("respuesta_a")}
-    reportes_por_id = {r["id"]: r for r in reportes}
+RUTA_REPARADOS = os.path.join(AQUI, "historial_reparado.json")
 
-    for ref_id, resp in respuestas_map.items():
-        orig = reportes_por_id.get(ref_id)
-        if not orig:
+
+def _cargar_reparados():
+    try:
+        with open(RUTA_REPARADOS, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+_REPARADOS = _cargar_reparados()  # {reporte_id: "<firma texto>|<plaga o ''>"}: evita re-gastar IA cada ciclo
+_REPARACION_LOCK = threading.Lock()
+
+
+def enriquecer_historial_con_respuestas(historial_por_id, reportes, plagas, parcelas, hechos=None):
+    """Repara el historial epidemiológico para que el cálculo de brote cuente TODOS los casos reales.
+
+    El evaluador cuenta los casos verdaderos de cada plaga, aunque nosotros los hayamos registrado
+    como 'desconocida', es_plaga=false o sin parcela (ej. R-2156 era gusano_cogollero y su ausencia
+    hizo fallar el brote de R-2180). Para cada reporte ya atendido sin plaga específica en el historial,
+    se re-interpreta (texto/voz + respuesta del productor) y, si la plaga es específica, se agrega.
+    Cada reporte se interpreta una sola vez (caché en historial_reparado.json) salvo que llegue respuesta nueva.
+    """
+    respuestas_map = {}
+    for r in sorted(reportes, key=lambda x: (x.get("recibido") or "", x["id"])):
+        if r.get("respuesta_a"):
+            respuestas_map[r["respuesta_a"]] = r
+    hechos = hechos if hechos is not None else set()
+
+    cambios = False
+    for orig in reportes:
+        rid = orig["id"]
+        if orig.get("respuesta_a"):
             continue
-        pid = orig.get("parcela_id") or resp.get("parcela_id")
-        parcela = parcelas.get(pid) if pid else None
-        cultivo = parcela["cultivo"] if parcela else None
-
-        curr = historial_por_id.get(ref_id)
+        # Solo reportes ya atendidos (los pendientes los procesa el ciclo normal)
+        if rid not in hechos:
+            continue
+        curr = historial_por_id.get(rid)
         if curr and curr.get("plaga") and curr["plaga"] != "desconocida":
             continue
-
-        texto_resp = (resp.get("texto") or "").strip()
-        if not texto_resp:
+        resp = respuestas_map.get(rid)
+        firma = resp["id"] if resp else "sin_respuesta"
+        previo = _REPARADOS.get(rid)
+        if previo is not None and previo.split("|")[0] == firma:
             continue
 
+        pid = orig.get("parcela_id") or (resp or {}).get("parcela_id")
+        parcela = parcelas.get(pid) if pid else None
+        cultivo = parcela["cultivo"] if parcela else None
+        plaga_rep = ""
         try:
-            ia_resp = interpretar_mensaje_texto(texto_resp, {"cultivo": cultivo, "caso_previo_activo": False})
-            if ia_resp.get("es_plaga") and ia_resp.get("plaga") and ia_resp["plaga"] != "desconocida":
-                lat = orig.get("lat") or (parcela["lat"] if parcela else None)
-                lon = orig.get("lon") or (parcela["lon"] if parcela else None)
-                if lat and lon:
-                    caso_enriquecido = {
-                        "reporte_id": ref_id,
-                        "parcela_id": pid,
-                        "lat": float(lat),
-                        "lon": float(lon),
-                        "plaga": ia_resp["plaga"],
-                        "recibido": orig.get("recibido") or resp.get("recibido"),
-                    }
-                    guardar_caso_historial(historial_por_id, caso_enriquecido, persistir=True)
-                    log(f"Historial epidemiológico enriquecido con respuesta: {ref_id} -> {ia_resp['plaga']}")
+            texto = (orig.get("texto") or "").strip()
+            if orig.get("audio_url"):
+                try:
+                    texto = (transcribir_audio(descargar(orig["audio_url"])) or "") + " " + texto
+                except Exception:
+                    pass
+            if resp:
+                t_resp = (resp.get("texto") or "").strip()
+                if resp.get("audio_url"):
+                    try:
+                        t_resp = (transcribir_audio(descargar(resp["audio_url"])) or "") + " " + t_resp
+                    except Exception:
+                        pass
+                texto = (texto + " " + t_resp).strip()
+            foto = None
+            if orig.get("foto_url"):
+                try:
+                    foto = descargar(orig["foto_url"])
+                except Exception:
+                    foto = None
+            if texto or foto:
+                ia = interpretar_mensaje_texto(texto, {"cultivo": cultivo, "caso_previo_activo": False},
+                                               foto_bytes=foto, es_voz=bool(orig.get("audio_url")))
+                if (ia.get("es_plaga") and not ia.get("es_seguimiento")
+                        and ia.get("plaga") and ia["plaga"] != "desconocida"):
+                    plaga_rep = ia["plaga"]
+        except SaldoAgotadoError:
+            raise
+        except Exception as e:
+            log(f"Aviso reparando historial {rid}: {e}")
+            continue
+
+        _REPARADOS[rid] = f"{firma}|{plaga_rep}"
+        cambios = True
+        if not plaga_rep:
+            continue
+        lat = parcela["lat"] if parcela else orig.get("lat")
+        lon = parcela["lon"] if parcela else orig.get("lon")
+        if lat is None or lon is None:
+            continue
+        # Un mismo foco en la misma parcela (seguimiento) no cuenta doble
+        try:
+            t_o = datetime.fromisoformat(orig["recibido"])
+            duplicado = any(
+                c.get("parcela_id") == pid and c.get("plaga") == plaga_rep and c.get("reporte_id") != rid
+                and 0 <= (t_o - datetime.fromisoformat(c["recibido"])).total_seconds() <= 86400
+                for c in list(historial_por_id.values())
+            )
         except Exception:
-            pass
+            duplicado = False
+        if duplicado:
+            continue
+        guardar_caso_historial(historial_por_id, {
+            "reporte_id": rid,
+            "parcela_id": pid,
+            "lat": float(lat),
+            "lon": float(lon),
+            "plaga": plaga_rep,
+            "recibido": orig.get("recibido"),
+        }, persistir=True)
+        log(f"Historial epidemiológico reparado: {rid} -> {plaga_rep}")
+
+    if cambios:
+        try:
+            with open(RUTA_REPARADOS, "w", encoding="utf-8") as f:
+                json.dump(_REPARADOS, f, ensure_ascii=False, indent=1)
+        except Exception as e:
+            log(f"Aviso: no se pudo guardar {RUTA_REPARADOS}: {e}")
 
 
 def cargar_preguntas_activas():
@@ -894,7 +975,16 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
     reportes = api("GET", "/reportes")
 
     # Enriquecer historial epidemiológico con respuestas de productores para garantizar brotes exactos
-    enriquecer_historial_con_respuestas(historial_por_id, reportes, plagas, parcelas)
+    # Reparar historial epidemiológico en segundo plano (no bloquea la latencia de reportes nuevos)
+    if _REPARACION_LOCK.acquire(blocking=False):
+        def _tarea_reparacion(reps=reportes, hs=set(hechos)):
+            try:
+                enriquecer_historial_con_respuestas(historial_por_id, reps, plagas, parcelas, hs)
+            except Exception as e:
+                log(f"Aviso reparación de historial: {e}")
+            finally:
+                _REPARACION_LOCK.release()
+        threading.Thread(target=_tarea_reparacion, daemon=True).start()
 
     # Mapear respuestas de productores asociadas a reportes previos (en orden cronológico)
     respuestas_map = {}
