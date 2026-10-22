@@ -24,29 +24,54 @@ CULTIVOS_POR_PLAGA = {
 PLAGAS_POR_CULTIVO = {
     "papa": ["tizon_tardio"],
     "limón": ["hlb"],
+    "limon": ["hlb"],
     "trigo": ["pulgon"],
     "grano almacenado": ["gorgojo_khapra"],
+    "grano_almacenado": ["gorgojo_khapra"],
+    "almacen": ["gorgojo_khapra"],
+    "bodega": ["gorgojo_khapra"],
     "jitomate": ["tizon_tardio", "mosquita_blanca"],
     "frijol": ["roya_frijol", "mosquita_blanca", "gallina_ciega", "chapulin"],
     "haba": ["mancha_chocolate", "pulgon", "gallina_ciega", "chapulin"],
     "maíz": ["gusano_cogollero", "pulgon", "gallina_ciega", "chapulin"],
+    "maiz": ["gusano_cogollero", "pulgon", "gallina_ciega", "chapulin"],
     "avena": ["pulgon", "gallina_ciega", "chapulin"],
 }
 
-# Regex determinante para detectar seguimientos (Sección 6, 9 y 12)
+def normalizar_cultivo(c):
+    """Normaliza el nombre de cultivo para tolerar acentos, mayúsculas y espacios."""
+    if not c:
+        return ""
+    txt = str(c).strip().lower()
+    tabla = str.maketrans("áéíóúÁÉÍÓÚ", "aeiouaeiou")
+    txt_sa = txt.translate(tabla)
+    if txt_sa in ("maiz", "maíz"):
+        return "maíz"
+    if txt_sa in ("limon", "limón"):
+        return "limón"
+    if txt_sa in ("grano almacenado", "grano_almacenado", "almacen", "bodega"):
+        return "grano almacenado"
+    return txt
+
+# Regex determinante para detectar seguimientos (Sección 6, 9 y 12 del reglamento oficial)
 SEGUIMIENTO_RE = re.compile(
-    r"\b(mi|mis|el|nuestro|nuestros)\s+(reporte|reportes|aviso|avisos|visita|caso)\b|"
-    r"\blo de ayer\b|\blo de antier\b|\blo que reporté\b|\blo que avisé\b|\blo que les dije\b|"
-    r"\bsigue igual\b|\bsiguen las manchas\b|\bse están secando\b|\bse secaron\b|\bya agarró más\b|"
-    r"\bse está pasando\b|\bse pasó a más\b|\bestán todas así\b|\botra foto\b|\bno ha mejorado\b|"
-    r"\bva peor\b|\bse extendió\b|\bcuándo vienen\b|\bya vienen\b|\bqué pasó con\b|"
-    r"\bconfirmar que les llegó\b|\bya mandaron\b|\bcuándo van a venir\b|\bno han venido\b",
+    r"\b(mi|mis|el|nuestro|nuestros)\s+(reporte|reportes|aviso|avisos|visita|caso|problema|predio|parcela)\b|"
+    r"\blo de ayer\b|\blo de antier\b|\blo de la semana pasada\b|\blo que reporté\b|\blo que avisé\b|\blo que les dije\b|\blo que les mandé\b|"
+    r"\b(ya\s+)?vieron\s+lo\s+de\b|\b(ya\s+)?vieron\s+lo\s+del\b|"
+    r"\bsigue igual\b|\bsiguen las manchas\b|\bse están secando\b|\bse siguen secando\b|\bse secaron\b|\bya agarró más\b|"
+    r"\bse está pasando\b|\bse pasó a más\b|\bestán todas así\b|\botra foto\b|\bles mando otra foto\b|\bno ha mejorado\b|"
+    r"\bva peor\b|\bse puso peor\b|\bestá peor\b|\bya empeoró\b|\bse extendió\b|\bavanzó más\b|\bsigue avanzando\b|"
+    r"\bsigue la plaga\b|\btodavía sigue\b|\bno se quita\b|\baún sigue\b|\bpersiste\b|"
+    r"\bcuándo vienen\b|\bya vienen\b|\bqué pasó con\b|\ba qué hora vienen\b|\ba qué hora llegan\b|"
+    r"\bno han venido\b|\bno ha venido nadie\b|\bnadie ha venido\b|\bsiguen sin venir\b|\bno han llegado\b|\bno han revisado\b|"
+    r"\b(ya\s+)?revisaron\b|\bya pasaron\b|\bcuándo van a venir\b|\bya mandaron\b|\bmandaron al técnico\b|\bviene el técnico\b|"
+    r"\bconfirmar que les llegó\b|\bconfirmar si llegó\b|\bsi recibieron\b|\bsi les llegó\b|\ben seguimiento\b",
     re.IGNORECASE,
 )
 
 # Regex determinante para mensajes que NO son reportes de plaga (Sección 6)
 NO_PLAGA_RE = re.compile(
-    r"\b(nomás para saludar|solo para saludar|saludos cordiales|un saludo cordial)\b|"
+    r"\b(nomás para saludar|solo para saludar|saludos cordiales|un saludo cordial|muchas gracias|muchisimas gracias)\b|"
     r"^\s*(hola|buenos días|buenas tardes|buenas noches|buen día|saludos)[,\.!\s]*$|"
     r"\b(cuánto están pagando|cuánto pagan|a cómo está el kilo|a cómo pagan|precio del kilo|precio de la tonelada)\b|"
     r"\b(apoyo del gobierno|apoyo para semilla|fertilizante del bienestar|entrega de fertilizante|programa de apoyo|subsidio)\b|"
@@ -59,7 +84,7 @@ SINTOMAS_CLAVE = {
     "roya_frijol": ["chahuixtle", "roya", "polvillo", "pústula", "pustula", "óxido", "oxido", "polvo", "herrumbre"],
     "pulgon": ["pulgón", "pulgon", "piojillo", "piojo", "mielecilla", "fumagina", "enrollada", "áfido", "afido"],
     "gallina_ciega": ["gallina ciega", "nixticuil", "gusano blanco", "raíz", "raiz", "suelo", "tierra", "acamada", "arrancar"],
-    "tizon_tardio": ["tizón", "tizon", "hielo", "quemazón", "quemazon", "quemada", "moho", "podrido", "algodoncito", "pelusilla", "mancha café", "mancha cafe", "tuberculo"],
+    "tizon_tardio": ["tizón", "tizon", "hielo", "quemazón", "quemazon", "quemada", "moho", "podrido", "algodoncito", "pelusilla", "mancha café", "mancha cafe", "tuberculo", "chahuixtle de la papa"],
     "mosquita_blanca": ["mosquita blanca", "mosquilla", "palomilla blanca", "palomilla", "mosca blanca", "nube", "enchinada", "pegajosa"],
     "chapulin": ["chapulín", "chapulin", "chapulines", "saltamonte", "saltamontes", "bordo", "orilla", "defoliada"],
     "mancha_chocolate": ["chocolate", "mancha de chocolate", "manchita café", "manchita cafe", "redonda", "caída de flor"],
@@ -139,12 +164,20 @@ def desambiguar_plaga_por_sintomas(texto, cultivo, candidatas):
     return "desconocida"
 
 
+NUMEROS_TEXTO_PCT = {
+    "diez": 10, "veinte": 20, "veinticinco": 25, "treinta": 30,
+    "cuarenta": 40, "cincuenta": 50, "sesenta": 60, "setenta": 70,
+    "setenta y cinco": 75, "ochenta": 80, "noventa": 90, "cien": 100
+}
+
 def extraer_pct_deterministico(texto):
     """Extrae porcentaje de daño fitosanitario mediante reglas y expresiones regulares."""
     if not texto:
         return 10
     txt = texto.lower()
-    m_pct = re.search(r"(\d{1,3})\s*%", txt)
+    
+    # 1. Búsqueda de porcentaje con dígitos: "30%", "40 por ciento", "75 porciento"
+    m_pct = re.search(r"(\d{1,3})\s*(?:%|por\s*ciento|porciento)", txt)
     if m_pct:
         try:
             val = int(m_pct.group(1))
@@ -153,21 +186,27 @@ def extraer_pct_deterministico(texto):
         except Exception:
             pass
 
-    if "tres cuartas partes" in txt or "tres cuartos" in txt:
+    # 2. Números en texto: "treinta por ciento", "cuarenta porciento"
+    for num_txt, num_val in NUMEROS_TEXTO_PCT.items():
+        if re.search(rf"\b{num_txt}\s*(?:%|por\s*ciento|porciento)\b", txt):
+            return num_val
+
+    # 3. Fracciones coloquiales usuales
+    if "tres cuartas partes" in txt or "tres cuartos" in txt or "3/4" in txt:
         return 75
-    if "mitad" in txt or "media parcela" in txt:
+    if "mitad" in txt or "media parcela" in txt or "medio predio" in txt or "1/2" in txt:
         return 50
-    if "un cuarto" in txt or "una cuarta parte" in txt or "una de cada cuatro" in txt:
+    if "un cuarto" in txt or "una cuarta parte" in txt or "una de cada cuatro" in txt or "1/4" in txt:
         return 25
-    if "una quinta parte" in txt or "una de cada cinco" in txt:
+    if "una quinta parte" in txt or "un quinto" in txt or "una de cada cinco" in txt or "1/5" in txt:
         return 20
-    if "una tercera parte" in txt or "un tercio" in txt:
+    if "una tercera parte" in txt or "un tercio" in txt or "una de cada tres" in txt or "1/3" in txt:
         return 33
-    if "dos terceras partes" in txt or "dos tercios" in txt:
+    if "dos terceras partes" in txt or "dos tercios" in txt or "dos de cada tres" in txt or "2/3" in txt:
         return 67
-    if "una décima parte" in txt or "una decima parte" in txt or "una de cada diez" in txt:
+    if "una décima parte" in txt or "una decima parte" in txt or "un décimo" in txt or "una de cada diez" in txt or "1/10" in txt:
         return 10
-    if "toda la parcela" in txt or "todas las matas" in txt or "todo el terreno" in txt or "todo el frijolar" in txt:
+    if "toda la parcela" in txt or "todas las matas" in txt or "todo el terreno" in txt or "todo el predio" in txt or "todo el frijolar" in txt or "toda la milpa" in txt:
         return 100
 
     return 10
@@ -176,14 +215,21 @@ def extraer_pct_deterministico(texto):
 def clasificar_heuristico(texto, cultivo=None, caso_previo=False):
     """Clasificador heurístico determinista 100% libre de LLM (fallback y salvaguarda)."""
     txt = (texto or "").strip()
-    cultivo_norm = (cultivo or "").strip().lower()
+    cultivo_norm = normalizar_cultivo(cultivo)
 
-    # 1. No plaga
+    # 1. No plaga evidente
     if NO_PLAGA_RE.search(txt) and not any(k in txt.lower() for k in ["gusano", "plaga", "enfermo", "pústula", "bicho", "mancha", "secando"]):
-        return {"es_plaga": False, "es_seguimiento": False, "plaga": None, "pct": None, "confianza": "alta", "razon": "Clasificado determinísticamente como mensaje ajeno a sanidad vegetal"}
+        return {
+            "es_plaga": False,
+            "es_seguimiento": False,
+            "plaga": None,
+            "pct": None,
+            "confianza": "alta",
+            "razon": "Clasificado determinísticamente como mensaje ajeno a sanidad vegetal"
+        }
 
-    # 2. Seguimiento
-    if SEGUIMIENTO_RE.search(txt) or (caso_previo and any(k in txt.lower() for k in ["secando", "sigue igual", "ya agarró", "pasando", "todas", "foto"])):
+    # 2. Seguimiento evidente
+    if SEGUIMIENTO_RE.search(txt) or (caso_previo and any(k in txt.lower() for k in ["secando", "sigue igual", "ya agarró", "pasando", "todas", "foto", "revis", "peor", "avanz"])):
         return {
             "es_plaga": True,
             "es_seguimiento": True,
@@ -193,7 +239,35 @@ def clasificar_heuristico(texto, cultivo=None, caso_previo=False):
             "razon": "Seguimiento determinista de caso previo (Sección 6 y 9)"
         }
 
-    # 3. Reporte de plaga
+    # 3. Verificar si el texto realmente reporta algún síntoma o daño fitosanitario
+    palabras_dano = ["plaga", "enferm", "bicho", "dañ", "mata", "hoja", "mancha", "gusano", "pulg", "hielo", "tizon", "tizón", "secand", "comiend", "cogollo", "pustula", "pústula", "polvo", "hong"]
+    tiene_sintoma = any(k in txt.lower() for k in palabras_dano) or any(
+        any(kw in txt.lower() for kw in kws) for kws in SINTOMAS_CLAVE.values()
+    )
+
+    if not txt or not tiene_sintoma:
+        if not txt:
+            # Mensaje vacío (e.g. audio no transcrito): se marca desconocida para requerir aclaración o registro defensivo
+            return {
+                "es_plaga": True,
+                "es_seguimiento": False,
+                "plaga": "desconocida",
+                "pct": 10,
+                "confianza": "baja",
+                "razon": "Mensaje sin texto o audio inaudible: plaga desconocida para requerir aclaración"
+            }
+        else:
+            # Texto sin síntomas fitosanitarios
+            return {
+                "es_plaga": False,
+                "es_seguimiento": False,
+                "plaga": None,
+                "pct": None,
+                "confianza": "media",
+                "razon": "Mensaje sin mención de síntomas fitosanitarios"
+            }
+
+    # 4. Reporte de plaga con síntomas
     pct = extraer_pct_deterministico(txt)
     candidatas = PLAGAS_POR_CULTIVO.get(cultivo_norm, list(CULTIVOS_POR_PLAGA.keys()))
 
@@ -290,7 +364,7 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
         raise ValueError("Se requiere API_OPEN_ROUTER")
 
     cultivo_val = (cultivo_parcela.get("cultivo") if isinstance(cultivo_parcela, dict) else cultivo_parcela) or ""
-    cultivo_norm = str(cultivo_val).strip().lower()
+    cultivo_norm = normalizar_cultivo(cultivo_val)
     caso_previo = cultivo_parcela.get("caso_previo_activo", False) if isinstance(cultivo_parcela, dict) else False
     txt_limpio = (texto or "").strip()
 
@@ -312,7 +386,7 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
         es_seguimiento_determinado = True
     elif caso_previo and txt_limpio:
         txt_l = txt_limpio.lower()
-        if any(f in txt_l for f in ["secando", "sigue igual", "ya agarró", "pasando a más", "están todas", "otra foto", "toda la parcela", "no mejora", "va peor", "se extendió"]):
+        if any(f in txt_l for f in ["secando", "sigue igual", "ya agarró", "pasando a más", "están todas", "otra foto", "toda la parcela", "no mejora", "va peor", "se extendió", "avanzó", "avanza", "revis", "visita", "técnico", "tecnico"]):
             es_seguimiento_determinado = True
 
     if es_seguimiento_determinado and not foto_bytes:
@@ -374,7 +448,7 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
 
     if caso_previo and parsed.get("es_plaga") and not parsed.get("es_seguimiento"):
         txt_l = (txt_limpio or "").lower()
-        if any(f in txt_l for f in ["secando", "sigue igual", "ya agarró", "pasando a más", "están todas", "otra foto", "toda la parcela", "no mejora", "va peor"]):
+        if any(f in txt_l for f in ["secando", "sigue igual", "ya agarró", "pasando a más", "están todas", "otra foto", "toda la parcela", "no mejora", "va peor", "se extendió", "avanzó", "avanza", "revis", "visita", "técnico", "tecnico"]):
             parsed["es_seguimiento"] = True
 
     if parsed.get("es_seguimiento"):
@@ -406,12 +480,12 @@ def interpretar_mensaje_texto(texto, cultivo_parcela=None, api_key=None, foto_by
             # trigo -> pulgon
             # grano almacenado -> gorgojo_khapra
             plaga_unica = permitidas[0]
-            if plaga_asignada != plaga_unica:
+            if plaga_asignada and plaga_asignada != "desconocida" and plaga_asignada != plaga_unica:
                 parsed["plaga"] = plaga_unica
                 parsed["razon"] = f"Ajuste biológico obligatorio: {cultivo_norm} únicamente puede albergar {plaga_unica}"
         else:
             # Cultivo polihuésped
-            if plaga_asignada not in permitidas and plaga_asignada != "desconocida":
+            if plaga_asignada and plaga_asignada != "desconocida" and plaga_asignada not in permitidas:
                 plaga_desambiguada = desambiguar_plaga_por_sintomas(txt_limpio, cultivo_norm, permitidas)
                 parsed["plaga"] = plaga_desambiguada
                 parsed["razon"] = f"Ajuste biológico cultivo {cultivo_norm}: {plaga_asignada} incompatible -> {plaga_desambiguada}"

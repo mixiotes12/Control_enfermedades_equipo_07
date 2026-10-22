@@ -7,17 +7,21 @@ import sys
 from interprete import interpretar_mensaje_texto, transcribir_audio
 from clasificador import calcular_prioridad_y_semaforo, seleccionar_tecnico
 
-# Cargar variables de entorno
-env_vars = {}
-with open("/home/missa/Desktop/form-DIMA-2026/.env") as f:
-    for line in f:
-        line = line.strip()
-        if not line or line.startswith("#"): continue
-        k, _, v = line.partition("=")
-        env_vars[k.strip()] = v.strip().strip("'\"")
+import os
 
-API_BASE = env_vars.get("API_REPORTES")
-TOKEN = env_vars.get("TOKEN")
+AQUI = os.path.dirname(os.path.abspath(__file__))
+env_vars = {}
+env_path = os.path.join(AQUI, ".env")
+if os.path.exists(env_path):
+    with open(env_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"): continue
+            k, _, v = line.partition("=")
+            env_vars[k.strip()] = v.strip().strip("'\"")
+
+API_BASE = env_vars.get("API_REPORTES") or env_vars.get("API_HACKATHON")
+TOKEN = env_vars.get("TOKEN") or env_vars.get("TOKEN_EQUIPO")
 API_KEY = env_vars.get("API_OPEN_ROUTER")
 
 def api_get(endpoint):
@@ -39,7 +43,7 @@ def descargar_media(url_relativa):
     if not url_relativa:
         return None
     url = f"{API_BASE}{url_relativa}"
-    req = urllib.request.Request(url)
+    req = urllib.request.Request(url, headers={"X-Equipo-Token": TOKEN})
     with urllib.request.urlopen(req) as resp:
         return resp.read()
 

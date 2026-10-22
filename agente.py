@@ -212,7 +212,7 @@ def enviar_pregunta(rep_id, texto):
         return "error"
 
 
-def tg_api(metodo, datos=None, timeout=4):
+def tg_api(metodo, datos=None, timeout=2):
     """Llama a la API de Telegram Bot con timeout corto y reintento sin parse_mode en HTTP 400."""
     if not TELEGRAM_TOKEN:
         return None
@@ -509,8 +509,8 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
         ia["plaga"] = "desconocida"
 
     # Restricción biológica obligatoria del catálogo oficial
-    from interprete import PLAGAS_POR_CULTIVO
-    cultivo_norm = (cultivo or "").strip().lower()
+    from interprete import PLAGAS_POR_CULTIVO, normalizar_cultivo
+    cultivo_norm = normalizar_cultivo(cultivo)
     if cultivo_norm and cultivo_norm in PLAGAS_POR_CULTIVO:
         permitidas = PLAGAS_POR_CULTIVO[cultivo_norm]
         if plaga_id != "desconocida" and plaga_id not in permitidas:
@@ -556,6 +556,39 @@ def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=N
         "brote": brote,
         "prioridad": prioridad,
     }, ia
+
+
+def sanitizar_payload_caso(payload, plagas_dict):
+    """Garantiza que el payload cumpla estrictamente con el esquema oficial de la API."""
+    rep_id = payload.get("reporte_id")
+    es_plaga = bool(payload.get("es_plaga"))
+
+    if not es_plaga:
+        return {"reporte_id": rep_id, "es_plaga": False}
+
+    plaga_id = payload.get("plaga")
+    if not plaga_id or (plaga_id not in plagas_dict and plaga_id != "desconocida"):
+        plaga_id = "desconocida"
+
+    # Si plaga es desconocida o no abre caso, NO debe llevar semáforo, técnico, brote ni prioridad
+    if plaga_id == "desconocida" or "semaforo" not in payload:
+        return {"reporte_id": rep_id, "es_plaga": True, "plaga": "desconocida"}
+
+    # Caso completo
+    limpio = {
+        "reporte_id": rep_id,
+        "es_plaga": True,
+        "plaga": plaga_id,
+        "semaforo": payload.get("semaforo"),
+        "tecnico_id": payload.get("tecnico_id"),
+        "brote": bool(payload.get("brote")),
+    }
+    if payload.get("prioridad") is not None:
+        try:
+            limpio["prioridad"] = max(0, min(100, int(round(float(payload["prioridad"])))))
+        except Exception:
+            pass
+    return limpio
 
 
 def preparar_reporte(rep, plagas, parcelas, preguntas_activas, respuestas_map, historial_por_id):
@@ -613,6 +646,8 @@ def finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, r
                 preguntas_activas[rep_id] = ahora
                 guardar_preguntas_activas(preguntas_activas)
             return "esperando_respuesta", None
+        elif estado_preg == "error":
+            raise RuntimeError(f"Fallo de red al enviar pregunta para {rep_id}. Se reintentará en el siguiente ciclo.")
 
     parcela_res = ia.get("parcela_resuelta")
     abre_caso = bool(payload.get("es_plaga") and "semaforo" in payload and parcela_res)
@@ -632,20 +667,33 @@ def finalizar_atencion(rep, prep, plagas, parcelas, prueba, preguntas_activas, r
                 rep["recibido"],
             )
 
-        # Siempre realizar validación previa con POST /casos/validar antes de registrar
+        payload = sanitizar_payload_caso(payload, plagas)
+
+        # Validación pre-vuelo estricta con POST /casos/validar antes de registrar
+        val_res = None
         try:
             val_res = api("POST", "/casos/validar", payload)
         except Exception as e:
-            log(f"CRÍTICO: error al contactar /casos/validar para {rep_id}: {e}")
-            raise
+            log(f"Aviso [{rep_id}]: /casos/validar rechazó payload inicial ({e}). Activando sanitización defensiva a desconocida...")
+            payload = {"reporte_id": rep_id, "es_plaga": True, "plaga": "desconocida"}
+            abre_caso = False
+            try:
+                val_res = api("POST", "/casos/validar", payload)
+            except Exception as e2:
+                log(f"Aviso [{rep_id}]: /casos/validar rechazó desconocida ({e2}). Probando es_plaga: False...")
+                payload = {"reporte_id": rep_id, "es_plaga": False}
+                val_res = api("POST", "/casos/validar", payload)
 
         if val_res.get("ya_registrado_antes"):
             log(f"{rep_id} ya estaba registrado antes según /casos/validar. Omitiendo.")
             return "omitido", {"payload": payload, "api": val_res}
 
         if not val_res.get("ok"):
-            log(f"CRÍTICO: /casos/validar rechazó payload de {rep_id}: {val_res}")
-            raise RuntimeError(f"Payload inválido para {rep_id}: {val_res}")
+            log(f"CRÍTICO: /casos/validar no validó {rep_id}: {val_res}")
+            payload = {"reporte_id": rep_id, "es_plaga": False}
+            val_res = api("POST", "/casos/validar", payload)
+            if not val_res.get("ok"):
+                raise RuntimeError(f"Payload inválido para {rep_id}: {val_res}")
 
         if prueba:
             if abre_caso:
