@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Alerta Plaga · Panel de Agricultores y Coordinación Técnica (Equipo 07 · MISA)</title>
+  <title>IT green · Plataforma de Vigilancia Fitosanitaria y Bioseguridad Agrícola</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -23,40 +23,19 @@
     <div class="topbar-inner">
       <div class="brand-area" id="brand-home" title="Volver a la página principal">
         <div class="brand-logo-container">
-          <svg class="logo-fitosanitario" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Logotipo Oficial Sanidad Vegetal">
-            <defs>
-              <linearGradient id="logo-shield-grad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#10b981" />
-                <stop offset="50%" stop-color="#059669" />
-                <stop offset="100%" stop-color="#0f766e" />
-              </linearGradient>
-              <linearGradient id="logo-radar-grad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#38bdf8" />
-                <stop offset="100%" stop-color="#0284c7" />
-              </linearGradient>
-              <linearGradient id="logo-leaf-grad" x1="12" y1="36" x2="32" y2="10" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#22c55e" />
-                <stop offset="60%" stop-color="#4ade80" />
-                <stop offset="100%" stop-color="#a3e635" />
-              </linearGradient>
-            </defs>
-            <path d="M22 3L6 9V20C6 29.5 12.8 38.3 22 41C31.2 38.3 38 29.5 38 20V9L22 3Z" fill="#0b1726" stroke="url(#logo-shield-grad)" stroke-width="2" stroke-linejoin="round"/>
-            <path d="M12 20C12 14.48 16.48 10 22 10" stroke="url(#logo-radar-grad)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
-            <path d="M8 20C8 12.27 14.27 6 22 6" stroke="url(#logo-radar-grad)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 4" opacity="0.6"/>
-            <path d="M22 34V15M22 15C18 19 15 25 18 29C20 31.6 22 34 22 34C22 34 24 31.6 26 29C29 25 26 19 22 15Z" fill="url(#logo-leaf-grad)" stroke="#15803d" stroke-width="1.2" stroke-linejoin="round"/>
-            <path d="M22 21L18.5 24M22 25L19 28M22 21L25.5 24M22 25L25 28" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.75"/>
-            <circle cx="22" cy="14" r="2.5" fill="#f59e0b"/>
-          </svg>
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-topbar" />
+          </div>
         </div>
         <div class="brand-text-block">
           <div class="brand-badges">
-            <span class="badge-equipo">
+            <span class="badge-corporate">
               <span class="pulse-dot"></span>
-              Equipo 07 · MISA · DIMA Chapingo
+              IT green · Red Agrícola
             </span>
-            <span class="badge-nivel">Hackathon Nivel 2 · En Vivo</span>
+            <span class="badge-sub">Monitoreo Fitosanitario Corporativo</span>
           </div>
-          <h1 class="brand-title">Alerta Plaga <span class="brand-subtitle">Vigilancia Fitosanitaria & Control Geoespacial</span></h1>
+          <h1 class="brand-title">IT green <span class="brand-subtitle">Sanidad Vegetal & Control Geoespacial</span></h1>
         </div>
       </div>
 
@@ -88,7 +67,7 @@
 
         <div id="indicador-en-vivo" class="live-status-pill" title="Sincronización automática con el Agente cada 10 segundos">
           <span class="live-dot" id="dot-en-vivo"></span>
-          <span class="live-label" id="texto-sync">En vivo</span>
+          <span class="live-label" id="texto-sync">Sincronizado</span>
         </div>
       </div>
     </div>
@@ -100,10 +79,15 @@
   <section id="vista-landing" class="landing-hero vista-contenedor vista-activa">
     <div class="landing-content">
       <div class="landing-header">
-        <span class="badge-equipo pulse-glow">Junta Local de Sanidad Vegetal · Región Texcoco</span>
-        <h1 class="landing-title">Sistema de Vigilancia Fitosanitaria <span class="gradient-text">Alerta Plaga</span></h1>
+        <div class="landing-brand-badge">
+          <div class="itgreen-logo-badge itgreen-badge-hero">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-hero" />
+          </div>
+        </div>
+        <span class="badge-corporate pulse-glow">Plataforma Empresarial de Bioseguridad y Sanidad Vegetal</span>
+        <h1 class="landing-title">Sistema Corporativo de Vigilancia Fitosanitaria <span class="gradient-text">IT green</span></h1>
         <p class="landing-sub">
-          Plataforma tecnológica para la detección temprana de plagas, asignación de técnicos de campo y protección epidemiológica de cultivos con IA y georreferenciación.
+          Detección asistida por inteligencia artificial, monitoreo epidemiológico de precisión y coordinación técnica de campo para la protección integral de cultivos.
         </p>
       </div>
 
@@ -152,7 +136,7 @@
         </div>
       </div>
 
-      <!-- Resumen en Vivo del Sistema -->
+      <!-- Métricas de Operación del Sistema -->
       <div class="landing-footer-kpis">
         <div class="lkpi-item">
           <span class="lkpi-val" id="land-kpi-casos">116</span>
@@ -180,9 +164,14 @@
   <div id="modal-auth-agricultor" class="modal-backdrop oculto" role="dialog" aria-modal="true">
     <div class="modal-card modal-auth-card">
       <div class="modal-header">
-        <div>
-          <span class="badge-equipo">ACCESO DE PRODUCTOR</span>
-          <h3>Iniciar Sesión en Portal Agricultor</h3>
+        <div class="modal-header-brand">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-modal" />
+          </div>
+          <div>
+            <span class="badge-corporate">PORTAL DEL AGRICULTOR · IT GREEN</span>
+            <h3>Iniciar Sesión en Portal Agricultor</h3>
+          </div>
         </div>
         <button type="button" class="btn-close-modal" id="btn-cerrar-auth-agri">&times;</button>
       </div>
@@ -200,17 +189,7 @@
           <div class="form-grupo">
             <label for="input-auth-pin-agri">PIN / Clave Fitosanitaria de Acceso:</label>
             <input type="password" id="input-auth-pin-agri" class="input-grande" placeholder="Ingresa PIN (ej. 1234)" value="1234" autocomplete="current-password">
-            <span class="input-ayuda">PIN predeterminado para productores: <code>1234</code> o los 4 dígitos de tu clave (ej. <code>0101</code> para PR-101)</span>
-          </div>
-
-          <div class="auth-demo-chips">
-            <span class="sub-hint">Productores destacados:</span>
-            <div class="chip-container">
-              <button type="button" class="chip-demo" data-pid="PR-101">PR-101 · Fidel Jiménez (P-001)</button>
-              <button type="button" class="chip-demo" data-pid="PR-105">PR-105 · Jacinto Vázquez (P-005, P-006)</button>
-              <button type="button" class="chip-demo" data-pid="PR-168">PR-168 · Andrés Corona (P-094 Brote)</button>
-              <button type="button" class="chip-demo" data-pid="PR-165">PR-165 · Gonzalo Morales (P-089)</button>
-            </div>
+            <span class="input-ayuda">PIN fitosanitario oficial de acceso: <code>1234</code> o los 4 dígitos de tu clave (ej. <code>0101</code> para PR-101)</span>
           </div>
 
           <div class="auth-actions">
@@ -230,20 +209,25 @@
   <div id="modal-auth-coordinador" class="modal-backdrop oculto" role="dialog" aria-modal="true">
     <div class="modal-card modal-auth-card">
       <div class="modal-header">
-        <div>
-          <span class="badge-equipo badge-admin">ACCESO RESTRINGIDO</span>
-          <h3>Autenticación de Coordinación Técnica</h3>
+        <div class="modal-header-brand">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-modal" />
+          </div>
+          <div>
+            <span class="badge-corporate badge-admin">CENTRO DE MANDO · IT GREEN</span>
+            <h3>Autenticación de Coordinación Técnica</h3>
+          </div>
         </div>
         <button type="button" class="btn-close-modal" id="btn-cerrar-auth-coord">&times;</button>
       </div>
       <div class="modal-body auth-body">
-        <p class="auth-hint">Ingresa con tu clave de acceso de la Junta Local o selecciona un rol técnico:</p>
+        <p class="auth-hint">Ingresa con tu clave de acceso institucional o selecciona un rol técnico:</p>
         
         <form id="form-auth-coord" onsubmit="return false;">
           <div class="form-grupo">
             <label for="input-auth-pin">Clave de Acceso / PIN:</label>
             <input type="password" id="input-auth-pin" class="input-grande" placeholder="Ingresa PIN (ej. 2026)" value="2026" autocomplete="current-password">
-            <span class="input-ayuda">PIN preconfigurado para jurados y equipo: <code>2026</code> o <code>amaranto-cebada-44</code></span>
+            <span class="input-ayuda">Clave de acceso institucional: <code>2026</code> o <code>amaranto-cebada-44</code></span>
           </div>
 
           <div class="form-grupo">
@@ -276,13 +260,18 @@
     </div>
   </div>
   <!-- ========================================================================
-       VISTA 1: CENTRO DE CONTROL TÉCNICO & COORDINACIÓN (NIVEL 2)
+       VISTA 1: CENTRO DE CONTROL TÉCNICO & COORDINACIÓN
        ======================================================================== -->
   <main id="vista-tecnico" class="vista-contenedor oculto">
     <!-- Banner contextual para técnicos -->
     <div class="section-banner banner-tecnico">
       <div class="banner-left">
-        <span class="banner-tag">COORDINACIÓN FITOSANITARIA · NIVEL 2</span>
+        <div class="banner-brand-wrap">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-banner" />
+          </div>
+          <span class="banner-tag">IT GREEN · CENTRO DE MANDO FITOSANITARIO</span>
+        </div>
         <h2>Monitoreo Regional de Casos, Brotes Epidemiológicos y Asignación de Técnicos</h2>
         <p>Visualiza en tiempo real los reportes clasificados por IA multimodal (texto, voz y foto), los anillos de brote (&ge;3 casos de la misma plaga a &le;5 km en 7 días) y la carga operativa de los 12 especialistas.</p>
       </div>
@@ -310,7 +299,7 @@
       <div class="kpi-card kpi-total">
         <div class="kpi-icon-wrap">📊</div>
         <div class="kpi-info">
-          <span class="kpi-title">Casos Nivel 2 Procesados</span>
+          <span class="kpi-title">Casos Fitosanitarios Procesados</span>
           <div class="kpi-value-row">
             <strong class="kpi-number" id="kpi-total-casos">42</strong>
             <span class="kpi-chip" id="kpi-sub-previos">+40 históricos</span>
@@ -402,11 +391,11 @@
       </div>
     </div>
 
-    <!-- Explorador de Casos de Nivel 2 -->
+    <!-- Explorador de Casos Fitosanitarios -->
     <div class="tarjeta card-explorador-casos">
       <div class="explorador-header">
         <div>
-          <h3>📋 Expedientes de Casos Clasificados (Nivel 2)</h3>
+          <h3>📋 Expedientes de Casos Fitosanitarios Clasificados</h3>
           <p class="sub-hint" id="contador-casos-filtrados">Mostrando 42 casos activos</p>
         </div>
 
@@ -490,13 +479,15 @@
       <div class="tarjeta panel-chat-box">
         <div class="chat-header">
           <div class="chat-header-info">
-            <div class="chat-avatar">🌱</div>
+            <div class="itgreen-logo-badge itgreen-avatar-badge">
+              <img src="/itgreen.png" alt="IT green" class="logo-itgreen-chat" />
+            </div>
             <div>
               <div class="chat-title-row">
-                <h3>Asistente Fitosanitario</h3>
-                <span class="chat-online-badge">● En línea</span>
+                <h3>Asistente Fitosanitario IT green</h3>
+                <span class="chat-online-badge">● Conectado</span>
               </div>
-              <p class="chat-subtitle">Sanidad Vegetal · Chapingo · Asistencia de Campo 24/7</p>
+              <p class="chat-subtitle">IT green · Bioseguridad Agrícola · Asistencia de Campo 24/7</p>
             </div>
           </div>
           <div class="chat-parcela-tag">
@@ -610,37 +601,46 @@
           <!-- Lienzo Interactivo SVG donde se dibuja solo la parcela y los círculos de daño -->
           <svg id="croquis-svg" class="croquis-svg-lienzo" viewBox="0 0 600 380" preserveAspectRatio="xMidYMid meet">
             <defs>
-              <pattern id="crop-pattern" width="28" height="28" patternUnits="userSpaceOnUse">
-                <rect width="28" height="28" fill="#0b2416"/>
-                <line x1="0" y1="7" x2="28" y2="7" stroke="#12472b" stroke-width="2"/>
-                <line x1="0" y1="21" x2="28" y2="21" stroke="#12472b" stroke-width="2"/>
-                <circle cx="14" cy="14" r="2.5" fill="#10b981" opacity="0.6"/>
-              </pattern>
+              <!-- Máscara de recorte con esquinas redondeadas según la parcela -->
+              <clipPath id="croquis-parcela-clip">
+                <rect x="30" y="25" width="540" height="330" rx="14"/>
+              </clipPath>
             </defs>
 
-            <!-- Fondo de la parcela (límite exacto de cultivo) -->
-            <rect id="croquis-parcela-rect" x="30" y="25" width="540" height="330" rx="14" fill="url(#crop-pattern)" stroke="#10b981" stroke-width="3"/>
-            
-            <!-- Cuadrícula y surcos internos -->
-            <g id="croquis-surcos-grid">
-              <line x1="30" y1="108" x2="570" y2="108" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
-              <line x1="30" y1="190" x2="570" y2="190" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
-              <line x1="30" y1="272" x2="570" y2="272" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
-              <line x1="165" y1="25" x2="165" y2="355" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
-              <line x1="300" y1="25" x2="300" y2="355" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
-              <line x1="435" y1="25" x2="435" y2="355" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
-            </g>
+            <!-- Ortofoto satelital fotorrealista de alta resolución de cultivos agrícolas -->
+            <image
+              id="croquis-satelite-img"
+              href="/croquis-satelite-ortofoto.jpg"
+              x="30"
+              y="25"
+              width="540"
+              height="330"
+              preserveAspectRatio="xMidYMid slice"
+              clip-path="url(#croquis-parcela-clip)"
+            />
+
+            <!-- Delimitación perimetral de la parcela con acento esmeralda IT green y área de clics -->
+            <rect
+              id="croquis-parcela-rect"
+              x="30"
+              y="25"
+              width="540"
+              height="330"
+              rx="14"
+              fill="transparent"
+              stroke="#00c067"
+              stroke-width="3"
+            />
 
             <!-- Grupo dinámico de círculos / focos de daño -->
             <g id="croquis-focos-group"></g>
 
-            <!-- Escala métrica visual -->
-            <g id="croquis-escala" transform="translate(440, 325)">
-              <rect x="0" y="0" width="115" height="18" fill="rgba(10,17,30,0.85)" rx="4" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
-              <line x1="12" y1="9" x2="102" y2="9" stroke="#ffffff" stroke-width="2"/>
-              <line x1="12" y1="4" x2="12" y2="14" stroke="#ffffff" stroke-width="2"/>
-              <line x1="102" y1="4" x2="102" y2="14" stroke="#ffffff" stroke-width="2"/>
-              <text x="57" y="12" fill="#ffffff" font-size="9" text-anchor="middle" font-family="monospace">50 metros</text>
+            <!-- Escala métrica visual 100% transparente en color negro nítido de alto contraste -->
+            <g id="croquis-escala" transform="translate(440, 320)">
+              <line x1="12" y1="9" x2="102" y2="9" stroke="#000000" stroke-width="2.5" stroke-linecap="square"/>
+              <line x1="12" y1="3" x2="12" y2="15" stroke="#000000" stroke-width="2.5" stroke-linecap="square"/>
+              <line x1="102" y1="3" x2="102" y2="15" stroke="#000000" stroke-width="2.5" stroke-linecap="square"/>
+              <text x="57" y="24" fill="#000000" font-size="10.5" font-weight="800" text-anchor="middle" font-family="'Inter', system-ui, sans-serif" letter-spacing="0.04em">50 metros</text>
             </g>
           </svg>
 
@@ -696,7 +696,12 @@
   <section id="vista-bitacora" class="vista-contenedor oculto">
     <div class="section-banner banner-bitacora">
       <div class="banner-left">
-        <span class="banner-tag">BITÁCORA DE PARCELA · SUPABASE & BUZÓN DE AVISOS</span>
+        <div class="banner-brand-wrap">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-banner" />
+          </div>
+          <span class="banner-tag">IT GREEN · BITÁCORA Y REGISTRO AGRONÓMICO</span>
+        </div>
         <h2>Registro Histórico de Actividades en Parcela y Notificaciones Emitidas</h2>
         <p>Consulta y registra actividades agronómicas en la tabla <code>registros</code> (sincronizada con Supabase y respaldo en servidor) y audita los avisos enviados a productores, técnicos y Sanidad Vegetal.</p>
       </div>
@@ -793,9 +798,14 @@
   <div id="modal-expediente" class="modal-backdrop oculto" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
     <div class="modal-card">
       <div class="modal-header">
-        <div>
-          <span class="badge-equipo" id="modal-folio-badge">EXPEDIENTE R-2001</span>
-          <h3 id="modal-titulo">Detalle Fitosanitario del Caso</h3>
+        <div class="modal-header-brand">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-modal" />
+          </div>
+          <div>
+            <span class="badge-corporate" id="modal-folio-badge">EXPEDIENTE R-2001</span>
+            <h3 id="modal-titulo">Detalle Fitosanitario del Caso</h3>
+          </div>
         </div>
         <button type="button" id="btn-cerrar-modal" class="btn-close-modal" aria-label="Cerrar">&times;</button>
       </div>

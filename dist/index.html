@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IT green · Plataforma de Vigilancia Fitosanitaria y Bioseguridad Agrícola</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+  <script type="module" crossorigin src="/assets/index-BUYdsGXg.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CMpck4eh.css">
+</head>
+<body>
+  <!-- Fondo ambiental decorativo -->
+  <div class="ambient-glow glow-1" aria-hidden="true"></div>
+  <div class="ambient-glow glow-2" aria-hidden="true"></div>
+
+  <!-- Notificación Toast Flotante -->
+  <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+  <!-- Encabezado Principal Sticky con Conmutador de Roles -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand-area" id="brand-home" title="Volver a la página principal">
+        <div class="brand-logo-container">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-topbar" />
+          </div>
+        </div>
+        <div class="brand-text-block">
+          <div class="brand-badges">
+            <span class="badge-corporate">
+              <span class="pulse-dot"></span>
+              IT green · Red Agrícola
+            </span>
+            <span class="badge-sub">Monitoreo Fitosanitario Corporativo</span>
+          </div>
+          <h1 class="brand-title">IT green <span class="brand-subtitle">Sanidad Vegetal & Control Geoespacial</span></h1>
+        </div>
+      </div>
+
+      <!-- Navegación interna exclusiva para Coordinador Técnico (solo visible al autenticar rol de coordinación) -->
+      <nav id="nav-coordinador" class="coord-nav-tabs oculto" aria-label="Submódulos de Coordinación">
+        <button type="button" class="btn-subnav active" id="btn-subnav-mando">
+          <span>🔬</span>
+          <span>Centro de Mando</span>
+        </button>
+        <button type="button" class="btn-subnav" id="btn-subnav-bitacora">
+          <span>📓</span>
+          <span>Bitácora & Avisos</span>
+        </button>
+      </nav>
+
+      <div class="topbar-actions">
+        <!-- Badge de Usuario Autenticado & Botón de Salir -->
+        <div id="usuario-sesion-badge" class="sesion-pill oculto">
+          <span id="sesion-icono">👤</span>
+          <div class="sesion-datos">
+            <strong id="sesion-nombre">—</strong>
+            <small id="sesion-rol">Sin sesión activa</small>
+          </div>
+          <button type="button" id="btn-cerrar-sesion" class="btn-cerrar-sesion" title="Cerrar sesión y volver al inicio">
+            <span>🚪</span>
+            <span>Salir</span>
+          </button>
+        </div>
+
+        <div id="indicador-en-vivo" class="live-status-pill" title="Sincronización automática con el Agente cada 10 segundos">
+          <span class="live-dot" id="dot-en-vivo"></span>
+          <span class="live-label" id="texto-sync">Sincronizado</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       LANDING PAGE & SELECTOR DE PORTALES (VISTA PRINCIPAL /)
+       ======================================================================== -->
+  <section id="vista-landing" class="landing-hero vista-contenedor vista-activa">
+    <div class="landing-content">
+      <div class="landing-header">
+        <div class="landing-brand-badge">
+          <div class="itgreen-logo-badge itgreen-badge-hero">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-hero" />
+          </div>
+        </div>
+        <span class="badge-corporate pulse-glow">Plataforma Empresarial de Bioseguridad y Sanidad Vegetal</span>
+        <h1 class="landing-title">Sistema Corporativo de Vigilancia Fitosanitaria <span class="gradient-text">IT green</span></h1>
+        <p class="landing-sub">
+          Detección asistida por inteligencia artificial, monitoreo epidemiológico de precisión y coordinación técnica de campo para la protección integral de cultivos.
+        </p>
+      </div>
+
+      <!-- Tarjetas de Acceso por Rol -->
+      <div class="landing-cards-grid">
+        <!-- Tarjeta 1: Portal del Agricultor -->
+        <div class="portal-card portal-card-agricultor" id="card-acceso-agricultor">
+          <div class="portal-glow" aria-hidden="true"></div>
+          <div class="portal-badge">Módulo de Campo · Productores</div>
+          <div class="portal-icon">👨‍🌾</div>
+          <h2 class="portal-title">Portal del Agricultor</h2>
+          <p class="portal-desc">
+            Consulta el estado fitosanitario de tus parcelas, activa tu <strong>Radar Epidemiológico de 5 km</strong> para vigilar plagas en parcelas vecinas y emite reportes o consultas directamente a tu bitácora.
+          </p>
+          <ul class="portal-features">
+            <li><span>🌱</span> Ficha de cultivo y etapa fenológica</li>
+            <li><span>📡</span> Radar de alertas en predios vecinos (&le;5 km)</li>
+            <li><span>📝</span> Simulador y reporte directo de plagas</li>
+            <li><span>📖</span> Bitácora persistente en Supabase</li>
+          </ul>
+          <button type="button" class="btn-portal btn-portal-agri" id="btn-entrar-agricultor">
+            <span>Ingresar como Productor</span>
+            <span class="btn-arrow">&rarr;</span>
+          </button>
+        </div>
+
+        <!-- Tarjeta 2: Centro de Mando Técnico & Coordinación -->
+        <div class="portal-card portal-card-coordinador" id="card-acceso-coordinador">
+          <div class="portal-glow" aria-hidden="true"></div>
+          <div class="portal-badge badge-admin">Centro de Mando · Autoridades</div>
+          <div class="portal-icon">🔬</div>
+          <h2 class="portal-title">Centro de Mando Técnico</h2>
+          <p class="portal-desc">
+            Panel táctico para el <strong>Coordinador y los 12 Técnicos Especialistas</strong>: mapa geoespacial regional, monitoreo de cargas operativas, anillos de brote activo, alertas cuarentenarias y avisos oficiales.
+          </p>
+          <ul class="portal-features">
+            <li><span>🗺️</span> Mapa geoespacial de 264 parcelas con Leaflet</li>
+            <li><span>👨‍🔬</span> Monitoreo y rutas de 12 técnicos de campo</li>
+            <li><span>🔥</span> Detección de cercos epidemiológicos (&ge;3 casos en 7d)</li>
+            <li><span>🚨</span> Semáforos prioritarios (24h, 48h, 72h) y Telegram</li>
+          </ul>
+          <button type="button" class="btn-portal btn-portal-coord" id="btn-entrar-coordinador">
+            <span>Acceso Coordinación Técnica</span>
+            <span class="btn-arrow">&rarr;</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Métricas de Operación del Sistema -->
+      <div class="landing-footer-kpis">
+        <div class="lkpi-item">
+          <span class="lkpi-val" id="land-kpi-casos">116</span>
+          <span class="lkpi-lbl">Casos Fitosanitarios Atendidos</span>
+        </div>
+        <div class="lkpi-item">
+          <span class="lkpi-val" id="land-kpi-productores">191</span>
+          <span class="lkpi-lbl">Productores en Padrón</span>
+        </div>
+        <div class="lkpi-item">
+          <span class="lkpi-val" id="land-kpi-parcelas">264</span>
+          <span class="lkpi-lbl">Parcelas Bajo Cobertura</span>
+        </div>
+        <div class="lkpi-item">
+          <span class="lkpi-val" id="land-kpi-tecnicos">12</span>
+          <span class="lkpi-lbl">Técnicos Desplegados</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       MODAL DE AUTENTICACIÓN: PORTAL DEL AGRICULTOR
+       ======================================================================== -->
+  <div id="modal-auth-agricultor" class="modal-backdrop oculto" role="dialog" aria-modal="true">
+    <div class="modal-card modal-auth-card">
+      <div class="modal-header">
+        <div class="modal-header-brand">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-modal" />
+          </div>
+          <div>
+            <span class="badge-corporate">PORTAL DEL AGRICULTOR · IT GREEN</span>
+            <h3>Iniciar Sesión en Portal Agricultor</h3>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-cerrar-auth-agri">&times;</button>
+      </div>
+      <div class="modal-body auth-body">
+        <p class="auth-hint">Selecciona tu clave de productor e ingresa tu PIN fitosanitario para autenticarte y cargar tus parcelas:</p>
+        
+        <form id="form-auth-agri" onsubmit="return false;">
+          <div class="form-grupo">
+            <label for="select-auth-productor">Clave o Nombre del Productor:</label>
+            <select id="select-auth-productor" class="input-grande">
+              <!-- Se puebla dinámicamente con los 191 productores -->
+            </select>
+          </div>
+
+          <div class="form-grupo">
+            <label for="input-auth-pin-agri">PIN / Clave Fitosanitaria de Acceso:</label>
+            <input type="password" id="input-auth-pin-agri" class="input-grande" placeholder="Ingresa PIN (ej. 1234)" value="1234" autocomplete="current-password">
+            <span class="input-ayuda">PIN fitosanitario oficial de acceso: <code>1234</code> o los 4 dígitos de tu clave (ej. <code>0101</code> para PR-101)</span>
+          </div>
+
+          <div class="auth-actions">
+            <button type="submit" id="btn-confirmar-auth-agri" class="btn-primario btn-full">
+              <span>Acceder a Mis Parcelas</span>
+              <span>&rarr;</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL DE AUTENTICACIÓN: CENTRO DE MANDO TÉCNICO
+       ======================================================================== -->
+  <div id="modal-auth-coordinador" class="modal-backdrop oculto" role="dialog" aria-modal="true">
+    <div class="modal-card modal-auth-card">
+      <div class="modal-header">
+        <div class="modal-header-brand">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-modal" />
+          </div>
+          <div>
+            <span class="badge-corporate badge-admin">CENTRO DE MANDO · IT GREEN</span>
+            <h3>Autenticación de Coordinación Técnica</h3>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-cerrar-auth-coord">&times;</button>
+      </div>
+      <div class="modal-body auth-body">
+        <p class="auth-hint">Ingresa con tu clave de acceso institucional o selecciona un rol técnico:</p>
+        
+        <form id="form-auth-coord" onsubmit="return false;">
+          <div class="form-grupo">
+            <label for="input-auth-pin">Clave de Acceso / PIN:</label>
+            <input type="password" id="input-auth-pin" class="input-grande" placeholder="Ingresa PIN (ej. 2026)" value="2026" autocomplete="current-password">
+            <span class="input-ayuda">Clave de acceso institucional: <code>2026</code> o <code>amaranto-cebada-44</code></span>
+          </div>
+
+          <div class="form-grupo">
+            <label for="select-auth-tecnico">Filtrar directamente como Técnico:</label>
+            <select id="select-auth-tecnico" class="input-grande">
+              <option value="todos">⭐ Coordinador General (Todos los 12 técnicos)</option>
+              <option value="T-01">T-01 · Ing. Paola Cruz (Fitopatología)</option>
+              <option value="T-02">T-02 · Ing. Tomás Ruiz (Entomología)</option>
+              <option value="T-03">T-03 · Ing. Laura Méndez (Entomología)</option>
+              <option value="T-04">T-04 · Ing. Ricardo Salinas (Entomología)</option>
+              <option value="T-05">T-05 · Ing. Sofía Morales (Fitopatología)</option>
+              <option value="T-06">T-06 · Ing. Jorge Bautista (Entomología)</option>
+              <option value="T-07">T-07 · Ing. Mariana Flores (Fitopatología)</option>
+              <option value="T-08">T-08 · Ing. Carlos Delgado (Entomología)</option>
+              <option value="T-09">T-09 · Ing. Diana Herrera (Fitopatología)</option>
+              <option value="T-10">T-10 · Ing. Héctor Reyes (Entomología)</option>
+              <option value="T-11">T-11 · Ing. Gabriela Navarro (Entomología)</option>
+              <option value="T-12">T-12 · Ing. Roberto Peña (Fitopatología)</option>
+            </select>
+          </div>
+
+          <div class="auth-actions">
+            <button type="submit" id="btn-confirmar-auth-coord" class="btn-primario btn-admin btn-full">
+              <span>Ingresar al Centro de Mando</span>
+              <span>&rarr;</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <!-- ========================================================================
+       VISTA 1: CENTRO DE CONTROL TÉCNICO & COORDINACIÓN
+       ======================================================================== -->
+  <main id="vista-tecnico" class="vista-contenedor oculto">
+    <!-- Banner contextual para técnicos -->
+    <div class="section-banner banner-tecnico">
+      <div class="banner-left">
+        <div class="banner-brand-wrap">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-banner" />
+          </div>
+          <span class="banner-tag">IT GREEN · CENTRO DE MANDO FITOSANITARIO</span>
+        </div>
+        <h2>Monitoreo Regional de Casos, Brotes Epidemiológicos y Asignación de Técnicos</h2>
+        <p>Visualiza en tiempo real los reportes clasificados por IA multimodal (texto, voz y foto), los anillos de brote (&ge;3 casos de la misma plaga a &le;5 km en 7 días) y la carga operativa de los 12 especialistas.</p>
+      </div>
+      <div class="banner-semaforos" id="resumen-semaforos-bar">
+        <button type="button" class="sem-pill sem-pill-todos active" data-sem="todos">
+          <span>Todos</span> <strong id="count-sem-todos">42</strong>
+        </button>
+        <button type="button" class="sem-pill sem-pill-rojo" data-sem="rojo">
+          <span class="dot dot-rojo"></span> <span>Rojo</span> <strong id="count-sem-rojo">0</strong>
+        </button>
+        <button type="button" class="sem-pill sem-pill-naranja" data-sem="naranja">
+          <span class="dot dot-naranja"></span> <span>Naranja</span> <strong id="count-sem-naranja">0</strong>
+        </button>
+        <button type="button" class="sem-pill sem-pill-amarillo" data-sem="amarillo">
+          <span class="dot dot-amarillo"></span> <span>Amarillo</span> <strong id="count-sem-amarillo">0</strong>
+        </button>
+        <button type="button" class="sem-pill sem-pill-verde" data-sem="verde">
+          <span class="dot dot-verde"></span> <span>Verde</span> <strong id="count-sem-verde">0</strong>
+        </button>
+      </div>
+    </div>
+
+    <!-- Cinta de Métricas Operativas Regionales (Exclusiva de Coordinación) -->
+    <section class="kpi-ribbon" aria-label="Resumen ejecutivo en tiempo real">
+      <div class="kpi-card kpi-total">
+        <div class="kpi-icon-wrap">📊</div>
+        <div class="kpi-info">
+          <span class="kpi-title">Casos Fitosanitarios Procesados</span>
+          <div class="kpi-value-row">
+            <strong class="kpi-number" id="kpi-total-casos">42</strong>
+            <span class="kpi-chip" id="kpi-sub-previos">+40 históricos</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-criticos">
+        <div class="kpi-icon-wrap">🚨</div>
+        <div class="kpi-info">
+          <span class="kpi-title">Urgencia Alta (Rojo / Naranja)</span>
+          <div class="kpi-value-row">
+            <strong class="kpi-number" id="kpi-urgentes">0</strong>
+            <span class="kpi-chip chip-danger" id="kpi-cuarentenarias">0 cuarentenarias</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-brotes">
+        <div class="kpi-icon-wrap">🔥</div>
+        <div class="kpi-info">
+          <span class="kpi-title">Brotes Activos (&le; 5 km / 7d)</span>
+          <div class="kpi-value-row">
+            <strong class="kpi-number" id="kpi-brotes-count">0</strong>
+            <span class="kpi-chip chip-warning">Cerco epidemiológico</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card kpi-tecnicos">
+        <div class="kpi-icon-wrap">👨‍🔬</div>
+        <div class="kpi-info">
+          <span class="kpi-title">Fuerza Técnica Desplegada</span>
+          <div class="kpi-value-row">
+            <strong class="kpi-number" id="kpi-tecnicos-activos">12</strong>
+            <span class="kpi-chip chip-info" id="kpi-avisos-total">105 avisos emitidos</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grid Superior Técnico: Mapa Táctico + Panel de Técnicos -->
+    <div class="tecnico-top-grid">
+      <!-- Mapa Táctico Geoespacial -->
+      <div class="tarjeta card-mapa-tactico">
+        <div class="card-header-row">
+          <div>
+            <h3>🗺️ Mapa Táctico de Alertas, Brotes y Cobertura Técnica</h3>
+            <p class="sub-hint">Haz clic en cualquier marcador para inspeccionar el caso, su radio de 5 km y la línea de asignación al técnico.</p>
+          </div>
+          <div class="mapa-toggles">
+            <button type="button" id="toggle-radios-brote" class="chip-toggle active" title="Mostrar círculos de 5 km en casos con brote">
+              🔥 Radios Brote (5 km)
+            </button>
+            <button type="button" id="toggle-bases-tecnicos" class="chip-toggle active" title="Mostrar bases de los 12 técnicos y rutas">
+              👨‍🔬 Técnicos & Rutas
+            </button>
+            <button type="button" id="toggle-casos-previos" class="chip-toggle" title="Superponer los 40 casos previos (R-1001..R-1040)">
+              📚 +40 Casos Previos
+            </button>
+            <button type="button" id="btn-centrar-mapa-tec" class="chip-toggle" title="Restablecer vista regional">
+              🎯 Centrar Región
+            </button>
+          </div>
+        </div>
+        <div id="mapa-tecnico" class="mapa-lienzo"></div>
+        <div class="mapa-leyenda">
+          <span class="ley-item"><i class="ley-dot dot-rojo"></i> Semáforo Rojo (24h)</span>
+          <span class="ley-item"><i class="ley-dot dot-naranja"></i> Semáforo Naranja (48h)</span>
+          <span class="ley-item"><i class="ley-dot dot-amarillo"></i> Semáforo Amarillo (72h)</span>
+          <span class="ley-item"><i class="ley-dot dot-verde"></i> Semáforo Verde (7d)</span>
+          <span class="ley-item"><i class="ley-ring"></i> 🔥 Brote Activo (&le;5 km)</span>
+          <span class="ley-item"><i class="ley-tec">T</i> Base de Técnico</span>
+        </div>
+      </div>
+
+      <!-- Columna Lateral: Fuerza Técnica (T-01 a T-12) -->
+      <div class="tarjeta card-escuadron-tecnico">
+        <div class="card-header-row">
+          <div>
+            <h3>👨‍🔬 Escuadrón de Técnicos (T-01 a T-12)</h3>
+            <p class="sub-hint">Selecciona un especialista para filtrar su ruta y casos asignados.</p>
+          </div>
+          <button type="button" id="btn-limpiar-tecnico" class="btn-mini-reset oculto">Ver todos</button>
+        </div>
+        <div id="lista-tecnicos-cards" class="tecnicos-scroll-grid">
+          <!-- Se puebla dinámicamente -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Explorador de Casos Fitosanitarios -->
+    <div class="tarjeta card-explorador-casos">
+      <div class="explorador-header">
+        <div>
+          <h3>📋 Expedientes de Casos Fitosanitarios Clasificados</h3>
+          <p class="sub-hint" id="contador-casos-filtrados">Mostrando 42 casos activos</p>
+        </div>
+
+        <!-- Barra de Filtros Avanzados -->
+        <div class="filtros-bar">
+          <div class="filtro-item">
+            <label for="filtro-busqueda">Buscar folio, parcela o municipio</label>
+            <input type="search" id="filtro-busqueda" placeholder="Ej. R-2055, P-094, Texcoco...">
+          </div>
+          <div class="filtro-item">
+            <label for="filtro-condicion">Condición Epidemiológica</label>
+            <select id="filtro-condicion">
+              <option value="todos">Todos los casos</option>
+              <option value="brote">🔥 Solo con BROTE activo</option>
+              <option value="cuarentenaria">⚠️ Plaga Cuarentenaria</option>
+              <option value="foto">📸 Reportes con Fotografía</option>
+              <option value="voz">🎙️ Reportes con Nota de Voz</option>
+              <option value="sin_tecnico">⏳ Sin técnico disponible</option>
+            </select>
+          </div>
+          <div class="filtro-item">
+            <label for="filtro-plaga-tec">Plaga Detectada</label>
+            <select id="filtro-plaga-tec">
+              <option value="todas">Todas las plagas (10)</option>
+            </select>
+          </div>
+          <div class="filtro-item">
+            <label for="filtro-tecnico-select">Técnico Asignado</label>
+            <select id="filtro-tecnico-select">
+              <option value="todos">Todos los técnicos (T-01..T-12)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabla-responsive">
+        <table class="tabla-casos" id="tabla-casos-nivel2">
+          <thead>
+            <tr>
+              <th>Folio & Fecha</th>
+              <th>Parcela & Ubicación</th>
+              <th>Cultivo & Etapa</th>
+              <th>Plaga Identificada</th>
+              <th>Prioridad & Semáforo</th>
+              <th>Estado Brote</th>
+              <th>Técnico Asignado</th>
+              <th>Evidencia</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-casos-nivel2">
+            <!-- Filas generadas dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       VISTA 2: PORTAL DEL AGRICULTOR (ASISTENTE CONVERSACIONAL & CROQUIS DE PARCELA)
+       ======================================================================== -->
+  <section id="vista-agricultor" class="vista-contenedor oculto">
+    <!-- Barra de Selección de Parcelas Propias (Aislamiento Total del Productor) -->
+    <div class="agr-parcelas-bar" id="agr-parcelas-bar">
+      <div class="agr-parcelas-label">
+        <span>🌱 Mis Parcelas Registradas:</span>
+      </div>
+      <div id="agr-parcelas-tabs" class="agr-parcelas-tabs">
+        <!-- Pestañas generadas dinámicamente con solo las parcelas de este productor -->
+      </div>
+    </div>
+
+    <!-- Tarjeta de Estado de Visita Técnica y Alertas Críticas (Minimalista, sin tablas ajenas) -->
+    <div id="agr-visita-status" class="agr-visita-status-box">
+      <!-- Se actualiza dinámicamente según la parcela seleccionada -->
+    </div>
+
+    <!-- Cuadrícula Principal: Chat Multimodal + Croquis Satelital de la Parcela -->
+    <div class="agricultor-main-grid">
+      <!-- Columna 1: Chat de Asistencia Multimodal -->
+      <div class="tarjeta panel-chat-box">
+        <div class="chat-header">
+          <div class="chat-header-info">
+            <div class="itgreen-logo-badge itgreen-avatar-badge">
+              <img src="/itgreen.png" alt="IT green" class="logo-itgreen-chat" />
+            </div>
+            <div>
+              <div class="chat-title-row">
+                <h3>Asistente Fitosanitario IT green</h3>
+                <span class="chat-online-badge">● Conectado</span>
+              </div>
+              <p class="chat-subtitle">IT green · Bioseguridad Agrícola · Asistencia de Campo 24/7</p>
+            </div>
+          </div>
+          <div class="chat-parcela-tag">
+            <span id="chat-parcela-badge">🌱 Sin parcela seleccionada</span>
+          </div>
+        </div>
+
+        <!-- Feed de Mensajes -->
+        <div id="chat-mensajes" class="chat-mensajes-feed">
+          <!-- Mensaje inicial de bienvenida y chips rápidos generados por JS -->
+        </div>
+
+        <!-- Indicador de que el Asistente está analizando -->
+        <div id="chat-typing" class="chat-typing-row oculto">
+          <div class="typing-bubble">
+            <span>El asistente está evaluando los síntomas</span>
+            <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
+          </div>
+        </div>
+
+        <!-- Barra de Previsualización de Adjuntos (Foto, Audio, Croquis) -->
+        <div id="chat-adjuntos-bar" class="chat-adjuntos-bar oculto">
+          <div id="adjunto-foto-preview" class="adjunto-chip oculto">
+            <img id="adjunto-foto-img" src="" alt="Foto adjunta" class="adjunto-thumb" />
+            <div class="adjunto-chip-info">
+              <span class="adjunto-chip-title">📸 Fotografía lista</span>
+              <span id="adjunto-foto-name" class="adjunto-chip-sub">evidencia.jpg</span>
+            </div>
+            <button type="button" id="btn-remover-foto" class="btn-adjunto-del" title="Quitar foto">✕</button>
+          </div>
+
+          <div id="adjunto-audio-preview" class="adjunto-chip oculto">
+            <span class="adjunto-chip-icon">🎙️</span>
+            <div class="adjunto-chip-info">
+              <span class="adjunto-chip-title">Nota de voz grabada</span>
+              <span id="adjunto-audio-dur" class="adjunto-chip-sub">0:05 s</span>
+            </div>
+            <audio id="adjunto-audio-player" controls class="adjunto-audio-mini"></audio>
+            <button type="button" id="btn-remover-audio" class="btn-adjunto-del" title="Quitar audio">✕</button>
+          </div>
+
+          <div id="adjunto-croquis-preview" class="adjunto-chip oculto">
+            <span class="adjunto-chip-icon">📐</span>
+            <div class="adjunto-chip-info">
+              <span class="adjunto-chip-title">Croquis de Daño Adjunto</span>
+              <span id="adjunto-croquis-desc" class="adjunto-chip-sub">1 foco · 0.55 ha (10.0%)</span>
+            </div>
+            <button type="button" id="btn-remover-croquis" class="btn-adjunto-del" title="Quitar croquis del reporte">✕</button>
+          </div>
+        </div>
+
+        <!-- Banner de Grabación Activa de Audio -->
+        <div id="chat-grabando-banner" class="chat-grabando-banner oculto">
+          <div class="grabando-indicador">
+            <span class="rec-pulse-dot"></span>
+            <span>Grabando nota de voz...</span>
+            <strong id="chat-rec-timer">0:00</strong>
+          </div>
+          <div class="grabando-actions">
+            <button type="button" id="btn-detener-audio" class="btn-rec-stop">⏹️ Listo</button>
+            <button type="button" id="btn-cancelar-audio" class="btn-rec-cancel">✕ Cancelar</button>
+          </div>
+        </div>
+
+        <!-- Barra de Entrada Multimodal (Texto, Cámara, Micrófono, Croquis) -->
+        <form id="chat-form" class="chat-input-bar">
+          <input type="file" id="chat-file-input" accept="image/*" class="oculto" capture="environment">
+          <button type="button" id="btn-adjuntar-foto" class="btn-chat-attach" title="Adjuntar foto de la hoja o plaga">
+            <span>📷</span>
+          </button>
+          <button type="button" id="btn-grabar-audio" class="btn-chat-attach" title="Grabar nota de voz">
+            <span>🎙️</span>
+          </button>
+          <button type="button" id="btn-adjuntar-croquis" class="btn-chat-attach" title="Adjuntar croquis y cálculo de áreas afectadas al reporte">
+            <span>📐</span>
+          </button>
+          <div class="chat-input-wrap">
+            <textarea id="chat-input-texto" rows="1" placeholder="Describe lo que notas (ej. hojas comidas, gusanos en cogollo)..."></textarea>
+          </div>
+          <button type="submit" id="btn-chat-enviar" class="btn-chat-send" title="Enviar reporte">
+            <span>➤</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Columna 2: Croquis Satelital de la Parcela & Zonificación de Daño -->
+      <div class="tarjeta panel-croquis-box">
+        <div class="croquis-header-agri">
+          <div class="croquis-header-tit">
+            <h3>📐 Croquis Fitosanitario de la Parcela</h3>
+            <p id="croquis-sub-hint" class="sub-hint">Impresión satelital del cultivo. Haz clic en la parcela para insertar focos de daño.</p>
+          </div>
+          <div class="croquis-metrics-pill" id="croquis-metrics-pill">
+            <span class="dot-danio"></span>
+            <span id="croquis-metrics-txt">Focos: <strong>1</strong> · Daño: <strong>10.0%</strong> (~0.55 ha)</span>
+          </div>
+        </div>
+
+        <!-- Contenedor del Lienzo Interactivo del Croquis (Solo la Parcela) -->
+        <div class="croquis-canvas-wrapper" id="croquis-canvas-wrapper">
+          <div class="croquis-parcela-badge" id="croquis-parcela-badge">
+            <span class="croquis-badge-cultivo" id="croquis-badge-cultivo">🌱 Maíz</span>
+            <strong id="croquis-badge-id">Parcela P-001 · San Miguel</strong>
+            <span id="croquis-badge-dims">5.50 ha · ~235 m × 234 m</span>
+          </div>
+          
+          <div class="croquis-orientacion-norte">
+            <span>⬆️ N</span>
+          </div>
+
+          <!-- Lienzo Interactivo SVG donde se dibuja solo la parcela y los círculos de daño -->
+          <svg id="croquis-svg" class="croquis-svg-lienzo" viewBox="0 0 600 380" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <!-- Máscara de recorte con esquinas redondeadas según la parcela -->
+              <clipPath id="croquis-parcela-clip">
+                <rect x="30" y="25" width="540" height="330" rx="14"/>
+              </clipPath>
+            </defs>
+
+            <!-- Ortofoto satelital fotorrealista de alta resolución de cultivos agrícolas -->
+            <image
+              id="croquis-satelite-img"
+              href="/croquis-satelite-ortofoto.jpg"
+              x="30"
+              y="25"
+              width="540"
+              height="330"
+              preserveAspectRatio="xMidYMid slice"
+              clip-path="url(#croquis-parcela-clip)"
+            />
+
+            <!-- Delimitación perimetral de la parcela con acento esmeralda IT green y área de clics -->
+            <rect
+              id="croquis-parcela-rect"
+              x="30"
+              y="25"
+              width="540"
+              height="330"
+              rx="14"
+              fill="transparent"
+              stroke="#00c067"
+              stroke-width="3"
+            />
+
+            <!-- Grupo dinámico de círculos / focos de daño -->
+            <g id="croquis-focos-group"></g>
+
+            <!-- Escala métrica visual 100% transparente en color negro nítido de alto contraste -->
+            <g id="croquis-escala" transform="translate(440, 320)">
+              <line x1="12" y1="9" x2="102" y2="9" stroke="#000000" stroke-width="2.5" stroke-linecap="square"/>
+              <line x1="12" y1="3" x2="12" y2="15" stroke="#000000" stroke-width="2.5" stroke-linecap="square"/>
+              <line x1="102" y1="3" x2="102" y2="15" stroke="#000000" stroke-width="2.5" stroke-linecap="square"/>
+              <text x="57" y="24" fill="#000000" font-size="10.5" font-weight="800" text-anchor="middle" font-family="'Inter', system-ui, sans-serif" letter-spacing="0.04em">50 metros</text>
+            </g>
+          </svg>
+
+          <div class="croquis-canvas-hint">
+            <span>🖱️ Clic en el croquis para agregar foco · Arrastra para mover · Ajusta radio abajo</span>
+          </div>
+        </div>
+
+        <!-- Barra de Controles del Croquis -->
+        <div class="croquis-toolbar">
+          <div class="croquis-actions-row">
+            <button type="button" id="btn-agregar-foco" class="btn-croquis-act btn-croquis-add">
+              <span>➕ Agregar Foco</span>
+            </button>
+            <button type="button" id="btn-eliminar-foco" class="btn-croquis-act btn-croquis-del" disabled>
+              <span>🗑️ Quitar Foco</span>
+            </button>
+            <button type="button" id="btn-limpiar-focos" class="btn-croquis-act btn-croquis-clear">
+              <span>↺ Limpiar Focos</span>
+            </button>
+            <button type="button" id="btn-adjuntar-croquis-directo" class="btn-croquis-act btn-croquis-attach-cta">
+              <span>📋 Adjuntar al Chat</span>
+            </button>
+          </div>
+
+          <div class="croquis-controls-grid">
+            <div class="croquis-slider-box">
+              <div class="slider-header-flex">
+                <span class="slider-lbl">Radio del foco seleccionado:</span>
+                <span id="croquis-radio-val" class="slider-val-badge">~25 m</span>
+              </div>
+              <input type="range" id="croquis-radio-slider" min="15" max="85" value="35" class="range-pct-agri">
+            </div>
+
+            <div class="croquis-resumen-box">
+              <span class="croquis-stat-lbl">Área Dañada Calculada:</span>
+              <div class="croquis-stat-values">
+                <strong id="croquis-calc-ha">0.55 ha</strong>
+                <span class="stat-sep">·</span>
+                <strong id="croquis-calc-pct">10.0%</strong>
+                <span class="stat-sup" id="croquis-calc-total">de 5.50 ha</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       VISTA 3: BITÁCORA FITOSANITARIA (SUPABASE) & BUZÓN DE AVISOS
+       ======================================================================== -->
+  <section id="vista-bitacora" class="vista-contenedor oculto">
+    <div class="section-banner banner-bitacora">
+      <div class="banner-left">
+        <div class="banner-brand-wrap">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-banner" />
+          </div>
+          <span class="banner-tag">IT GREEN · BITÁCORA Y REGISTRO AGRONÓMICO</span>
+        </div>
+        <h2>Registro Histórico de Actividades en Parcela y Notificaciones Emitidas</h2>
+        <p>Consulta y registra actividades agronómicas en la tabla <code>registros</code> (sincronizada con Supabase y respaldo en servidor) y audita los avisos enviados a productores, técnicos y Sanidad Vegetal.</p>
+      </div>
+      <div class="banner-actions">
+        <button type="button" id="btn-exportar-csv" class="btn-secundario-accion">⬇️ Exportar Bitácora CSV</button>
+      </div>
+    </div>
+
+    <div class="bitacora-grid">
+      <!-- Formulario de Bitácora General (Compatible con la plantilla Supabase) -->
+      <div class="tarjeta">
+        <h3>📓 Nuevo Registro de Bitácora Agronómica</h3>
+        <p class="sub-hint">Registra labores culturales, muestreos o aplicaciones fitosanitarias en cualquier parcela.</p>
+        <form id="form-bitacora-directa" class="form-stack">
+          <div class="dos">
+            <div class="campo">
+              <label for="bit-fecha">Fecha</label>
+              <input type="date" id="bit-fecha" name="fecha" required>
+            </div>
+            <div class="campo">
+              <label for="bit-parcela">Parcela</label>
+              <select id="bit-parcela" name="parcela" required></select>
+            </div>
+          </div>
+          <div class="dos">
+            <div class="campo">
+              <label for="bit-cultivo">Cultivo</label>
+              <input type="text" id="bit-cultivo" name="cultivo" required placeholder="Ej. Maíz">
+            </div>
+            <div class="campo">
+              <label for="bit-actividad">Actividad Realizada</label>
+              <select id="bit-actividad" name="actividad" required>
+                <option value="Observación fitosanitaria">Observación fitosanitaria</option>
+                <option value="Muestreo de trampas y follaje">Muestreo de trampas y follaje</option>
+                <option value="Control biológico / Liberación de benéficos">Control biológico / Liberación de benéficos</option>
+                <option value="Aplicación focalizada autorizada">Aplicación focalizada autorizada</option>
+                <option value="Cerco sanitario por brote vecino">Cerco sanitario por brote vecino</option>
+                <option value="Riego y nutrición vegetal">Riego y nutrición vegetal</option>
+              </select>
+            </div>
+          </div>
+          <div class="campo">
+            <label for="bit-observaciones">Observaciones de Campo</label>
+            <textarea id="bit-observaciones" name="observaciones" rows="3" placeholder="Describe los hallazgos, dosis o recomendaciones del técnico..."></textarea>
+          </div>
+          <button type="submit" class="btn-submit-glow">💾 Guardar en Bitácora (Supabase & Servidor)</button>
+          <p id="bit-estado" class="estado"></p>
+        </form>
+
+        <hr class="divisor-sutil">
+
+        <h3>📑 Registros Guardados en Bitácora</h3>
+        <div class="tabla-responsive">
+          <table class="tabla-casos" id="tabla-bitacora-general">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Parcela</th>
+                <th>Cultivo</th>
+                <th>Actividad</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-bitacora-general"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Columna Derecha: Buzón Oficial de Avisos (POST /avisos & Bot Telegram) -->
+      <div class="tarjeta">
+        <div class="card-header-row">
+          <div>
+            <h3>📡 Historial de Avisos Oficiales Emitidos (API & Telegram)</h3>
+            <p class="sub-hint">Notificaciones automáticas enviadas por <code>agente.py</code> vía <code>POST /avisos</code> y <code>@CoordinadorAlertasBot</code>.</p>
+          </div>
+          <select id="filtro-tipo-aviso" class="select-compacto">
+            <option value="todos">Todos los tipos</option>
+            <option value="brote">🔥 Alertas de Brote</option>
+            <option value="cuarentenaria">⚠️ Cuarentenarias</option>
+            <option value="asignacion">👨‍🔬 Asignación a Técnico</option>
+            <option value="folio">🎫 Acuse de Folio</option>
+          </select>
+        </div>
+        <div id="feed-avisos-oficiales" class="avisos-feed">
+          <!-- Poblado dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================================================================
+       MODAL INTERACTIVO DE EXPEDIENTE DE CASO (FOTOS, AUDIO Y MATEMÁTICA)
+       ======================================================================== -->
+  <div id="modal-expediente" class="modal-backdrop oculto" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-header-brand">
+          <div class="itgreen-logo-badge">
+            <img src="/itgreen.png" alt="IT green" class="logo-itgreen-modal" />
+          </div>
+          <div>
+            <span class="badge-corporate" id="modal-folio-badge">EXPEDIENTE R-2001</span>
+            <h3 id="modal-titulo">Detalle Fitosanitario del Caso</h3>
+          </div>
+        </div>
+        <button type="button" id="btn-cerrar-modal" class="btn-close-modal" aria-label="Cerrar">&times;</button>
+      </div>
+      <div id="modal-cuerpo" class="modal-body">
+        <!-- Se inyecta dinámicamente el expediente completo -->
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

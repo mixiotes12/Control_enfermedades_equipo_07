@@ -1,17 +1,20 @@
 :root {
-  --fondo: #070d19;
-  --fondo-sec: #0d1627;
-  --tarjeta: rgba(19, 30, 50, 0.85);
-  --tarjeta-solida: #131e32;
-  --tarjeta-hover: #1a2942;
+  --itgreen-emerald: #00c067;
+  --itgreen-emerald-dark: #009650;
+  --itgreen-emerald-light: #34d399;
+  --fondo: #060d17;
+  --fondo-sec: #0a1424;
+  --tarjeta: rgba(12, 22, 36, 0.88);
+  --tarjeta-solida: #0c1626;
+  --tarjeta-hover: #122238;
   --texto: #f8fafc;
   --texto-sec: #cbd5e1;
   --tenue: #8b9bb4;
-  --linea: rgba(148, 163, 184, 0.16);
-  --linea-fuerte: rgba(148, 163, 184, 0.28);
-  --primario: #10b981;
-  --primario-hover: #059669;
-  --primario-glow: rgba(16, 185, 129, 0.28);
+  --linea: rgba(0, 192, 103, 0.14);
+  --linea-fuerte: rgba(0, 192, 103, 0.28);
+  --primario: #00c067;
+  --primario-hover: #009650;
+  --primario-glow: rgba(0, 192, 103, 0.28);
   --azul: #38bdf8;
   --violeta: #a855f7;
   --rojo: #ef4444;
@@ -129,6 +132,7 @@ body {
   margin-bottom: 4px;
 }
 
+.badge-corporate,
 .badge-equipo {
   display: inline-flex;
   align-items: center;
@@ -136,30 +140,38 @@ body {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   padding: 3px 10px;
-  background: rgba(16, 185, 129, 0.16);
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: rgba(0, 192, 103, 0.14);
+  border: 1px solid rgba(0, 192, 103, 0.35);
   color: #34d399;
   border-radius: 999px;
+}
+
+.badge-corporate.badge-admin,
+.badge-equipo.badge-admin {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
 }
 
 .pulse-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #10b981;
+  background: #00c067;
   animation: pulseDot 2s infinite;
 }
 
+.badge-sub,
 .badge-nivel {
   font-size: 11px;
   font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.14);
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  color: #7dd3fc;
+  background: rgba(0, 192, 103, 0.12);
+  border: 1px solid rgba(0, 192, 103, 0.28);
+  color: #a7f3d0;
 }
 
 .brand-title {
@@ -726,7 +738,7 @@ h3 {
   transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Explorador de Casos Nivel 2 */
+/* Explorador de Casos Fitosanitarios */
 .explorador-header {
   display: flex;
   justify-content: space-between;
@@ -1829,7 +1841,10 @@ tbody tr:hover {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  touch-action: none !important;
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .croquis-parcela-badge {
@@ -1879,11 +1894,16 @@ tbody tr:hover {
   color: #94a3b8;
 }
 
-.croquis-svg-lienzo {
+.croquis-svg-lienzo,
+#croquis-svg {
   width: 100%;
   height: 100%;
   max-height: 400px;
   cursor: crosshair;
+  touch-action: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .croquis-canvas-hint {
@@ -2035,8 +2055,16 @@ tbody tr:hover {
 }
 
 /* Focos interactivos en SVG */
-.foco-circulo-svg {
+.foco-circulo-svg,
+.foco-centro-dot,
+g[data-foco-id] {
   cursor: move;
+  touch-action: none !important;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.foco-circulo-svg {
   transition: stroke-width 0.15s ease;
 }
 .foco-circulo-svg:hover {
@@ -2048,7 +2076,7 @@ tbody tr:hover {
   filter: drop-shadow(0 0 8px #ef4444);
 }
 .foco-centro-dot {
-  cursor: move;
+  touch-action: none !important;
 }
 .foco-label-text {
   font-family: var(--mono);
@@ -2057,6 +2085,23 @@ tbody tr:hover {
   fill: #ffffff;
   pointer-events: none;
   text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+}
+
+/* Escala Métrica 100% Transparente y Alto Contraste Negro */
+#croquis-escala {
+  pointer-events: none;
+}
+#croquis-escala line {
+  stroke: #000000 !important;
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.75));
+}
+#croquis-escala text {
+  fill: #000000 !important;
+  font-weight: 800;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.8));
 }
 
 /* Panel del Mapa Satelital Fitosanitario */
@@ -2718,7 +2763,7 @@ tbody tr:hover {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #34d399 0%, #38bdf8 50%, #a78bfa 100%);
+  background: linear-gradient(135deg, #00c067 0%, #34d399 45%, #38bdf8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -3073,3 +3118,95 @@ tbody tr:hover {
     margin-left: 0;
   }
 }
+
+/* ============================================================================
+   IDENTIDAD CORPORATIVA IT GREEN (itgreen.io) & LOGO BADGES
+   ============================================================================ */
+
+/* Cápsula de Logo Oficial IT green para contraste impecable sobre temas oscuros */
+.itgreen-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.96);
+  padding: 4px 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(0, 192, 103, 0.35);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), 0 0 10px rgba(0, 192, 103, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.itgreen-logo-badge:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 14px rgba(0, 192, 103, 0.35);
+}
+
+.itgreen-badge-hero {
+  padding: 8px 20px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 16px rgba(0, 192, 103, 0.3);
+}
+
+.itgreen-avatar-badge {
+  padding: 4px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.logo-itgreen-topbar {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.logo-itgreen-hero {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.logo-itgreen-modal {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.logo-itgreen-banner {
+  height: 26px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.logo-itgreen-chat {
+  height: 24px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.landing-brand-badge {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.banner-brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.modal-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+

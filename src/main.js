@@ -316,6 +316,7 @@ const capaEtiquetasTec = L.tileLayer(
 capaSateliteTec.addTo(mapTecnico);
 capaEtiquetasTec.addTo(mapTecnico);
 
+const layerParcelasTec = L.layerGroup().addTo(mapTecnico);
 const layerCasosTec = L.layerGroup().addTo(mapTecnico);
 const layerBrotesTec = L.layerGroup().addTo(mapTecnico);
 const layerTecnicosBases = L.layerGroup().addTo(mapTecnico);
@@ -490,8 +491,10 @@ document.querySelector("#btn-subnav-bitacora")?.addEventListener("click", () => 
 // ============================================================================
 function guardarSesion(sesion) {
   try {
-    sessionStorage.setItem("alerta_plaga_sesion", JSON.stringify(sesion));
+    sessionStorage.setItem("itgreen_sesion", JSON.stringify(sesion));
+    sessionStorage.removeItem("alerta_plaga_sesion");
     // Limpieza estricta de localStorage para evitar que la sesión persista tras salir o entre pestañas
+    localStorage.removeItem("itgreen_sesion");
     localStorage.removeItem("alerta_plaga_sesion");
   } catch {}
   actualizarBadgeSesion(sesion);
@@ -499,7 +502,7 @@ function guardarSesion(sesion) {
 
 function cargarSesion() {
   try {
-    const raw = sessionStorage.getItem("alerta_plaga_sesion");
+    const raw = sessionStorage.getItem("itgreen_sesion") || sessionStorage.getItem("alerta_plaga_sesion");
     if (raw) return JSON.parse(raw);
   } catch {}
   return null;
@@ -551,11 +554,23 @@ function aplicarSesion(sesion) {
     const primeraParcela = prod?.parcelas?.[0] || estadoApp.parcelas[0]?.id;
     if (primeraParcela) seleccionarParcelaAgricultor(primeraParcela);
   } else if (sesion.rol === "coordinador" || sesion.rol === "tecnico") {
-    const tecId = sesion.id || "todos";
+    const tecId = sesion.rol === "tecnico" ? (sesion.id || "T-01") : (sesion.id || "todos");
     estadoApp.filtroTecnico = tecId;
-    const selTec = document.querySelector("#filtro-tecnico");
-    if (selTec) selTec.value = tecId;
-    filtrarCasosTecnico();
+    const selTec = document.querySelector("#filtro-tecnico-select");
+    const btnReset = document.querySelector("#btn-limpiar-tecnico");
+    if (selTec) {
+      selTec.value = tecId;
+      selTec.disabled = sesion.rol === "tecnico";
+    }
+    if (btnReset && sesion.rol === "tecnico") {
+      btnReset.classList.add("oculto");
+      btnReset.style.display = "none";
+    }
+    actualizarVistaTecnico();
+    if (tecId !== "todos") {
+      const t = mapaTecnicos.get(tecId);
+      if (t) mapTecnico.flyTo([Number(t.lat), Number(t.lon)], 12, { duration: 0.7 });
+    }
   }
 }
 
@@ -601,9 +616,22 @@ function cerrarModalAuthCoordinador() {
 
 function cerrarSesionUsuario(mostrarAviso = true) {
   try {
+    sessionStorage.removeItem("itgreen_sesion");
     sessionStorage.removeItem("alerta_plaga_sesion");
+    localStorage.removeItem("itgreen_sesion");
     localStorage.removeItem("alerta_plaga_sesion");
   } catch {}
+  estadoApp.filtroTecnico = "todos";
+  const selTec = document.querySelector("#filtro-tecnico-select");
+  if (selTec) {
+    selTec.disabled = false;
+    selTec.value = "todos";
+  }
+  const btnReset = document.querySelector("#btn-limpiar-tecnico");
+  if (btnReset) {
+    btnReset.style.display = "";
+    btnReset.classList.add("oculto");
+  }
   chatHistorialParcelas.clear();
   puntosDanioPorParcela.clear();
   pctDanioPorParcela.clear();
@@ -763,7 +791,7 @@ function inicializarEventosAuth() {
 
     // Validar PIN de acceso (preconfigurado 2026 o clave oficial de equipo)
     if (pin && pin !== "2026" && pin !== "amaranto-cebada-44" && pin !== "admin") {
-      mostrarToast("⚠️ Clave/PIN incorrecto. Usa el PIN de demostración: 2026");
+      mostrarToast("⚠️ Clave/PIN incorrecto. Usa la clave oficial: 2026");
       return;
     }
 
@@ -904,11 +932,20 @@ function renderizarEscuadronTecnicos() {
   const btnReset = document.querySelector("#btn-limpiar-tecnico");
   if (!cont) return;
 
+  const sesion = cargarSesion();
+  const esTecnico = sesion && sesion.rol === "tecnico";
+
   if (btnReset) {
-    btnReset.classList.toggle("oculto", estadoApp.filtroTecnico === "todos");
+    if (esTecnico) {
+      btnReset.classList.add("oculto");
+      btnReset.style.display = "none";
+    } else {
+      btnReset.style.display = "";
+      btnReset.classList.toggle("oculto", estadoApp.filtroTecnico === "todos");
+    }
   }
 
-  // Contar cuántos casos de Nivel 2 tiene asignado cada técnico
+  // Contar cuántos casos tiene asignado cada técnico
   const conteoCasosPorTec = new Map();
   const brotesPorTec = new Map();
   for (const c of estadoApp.casosHistorial) {
@@ -944,7 +981,7 @@ function renderizarEscuadronTecnicos() {
       <div class="tec-carga-wrap">
         <div class="tec-carga-labels">
           <span>Carga activa: <strong>${cargaActual}/${tope}</strong></span>
-          <span>Nivel 2: <strong>${asignadosN2} casos</strong> ${brotesN2 > 0 ? `(🔥${brotesN2})` : ""}</span>
+          <span>Casos asignados: <strong>${asignadosN2}</strong> ${brotesN2 > 0 ? `(🔥${brotesN2})` : ""}</span>
         </div>
         <div class="tec-bar-bg">
           <div class="tec-bar-fill" style="width: ${pctCarga}%; background: ${colorBarra}"></div>
@@ -952,6 +989,12 @@ function renderizarEscuadronTecnicos() {
       </div>
     `;
     card.addEventListener("click", () => {
+      if (esTecnico) {
+        if (estadoApp.filtroTecnico !== t.id) {
+          mostrarToast(`🔒 Acceso restringido: Vista fijada exclusivamente a tu perfil (${sesion.id})`);
+        }
+        return;
+      }
       estadoApp.filtroTecnico = estadoApp.filtroTecnico === t.id ? "todos" : t.id;
       const selTec = document.querySelector("#filtro-tecnico-select");
       if (selTec) selTec.value = estadoApp.filtroTecnico;
@@ -964,11 +1007,81 @@ function renderizarEscuadronTecnicos() {
   });
 }
 
+function obtenerTecnicoMasCercano(lat, lon) {
+  let minDist = Infinity;
+  let bestTecId = "T-01";
+  for (const t of estadoApp.tecnicos) {
+    const d = haversineKm(Number(lat), Number(lon), Number(t.lat), Number(t.lon));
+    if (d < minDist) {
+      minDist = d;
+      bestTecId = t.id;
+    }
+  }
+  return bestTecId;
+}
+
+function obtenerParcelasVisibles() {
+  if (!estadoApp.filtroTecnico || estadoApp.filtroTecnico === "todos") {
+    // Coordinador General: Red íntegra de 264 parcelas
+    return estadoApp.parcelas;
+  }
+  const tId = estadoApp.filtroTecnico;
+  // 1. Parcelas con casos activos o históricos vinculados a este técnico
+  const parcelasConCasos = new Set();
+  const todosLosCasos = [...estadoApp.casosHistorial, ...estadoApp.casosPrevios];
+  for (const c of todosLosCasos) {
+    if (c.tecnico_id === tId && c.parcela_id) {
+      parcelasConCasos.add(c.parcela_id);
+    }
+  }
+  // 2. Parcelas dentro de la jurisdicción geográfica de su base
+  return estadoApp.parcelas.filter((p) => {
+    if (parcelasConCasos.has(p.id)) return true;
+    return obtenerTecnicoMasCercano(p.lat, p.lon) === tId;
+  });
+}
+
 function renderizarMapaTecnico(casosFiltrados) {
+  layerParcelasTec.clearLayers();
   layerCasosTec.clearLayers();
   layerBrotesTec.clearLayers();
   layerTecnicosBases.clearLayers();
   layerRutasTecnicos.clearLayers();
+
+  // 0. Dibujar huellas poligonales de parcelas según el técnico activo (aislamiento R3) o red completa
+  const parcelasVisibles = obtenerParcelasVisibles();
+  for (const p of parcelasVisibles) {
+    const latP = Number(p.lat);
+    const lonP = Number(p.lon);
+    if (!latP || !lonP) continue;
+
+    const supHa = Number(p.superficie_ha) || 5;
+    const ladoMetros = Math.sqrt(supHa * 10000);
+    const deltaLat = ladoMetros / 111320 / 2;
+    const deltaLon = ladoMetros / (111320 * Math.cos((latP * Math.PI) / 180)) / 2;
+    const bounds = [
+      [latP - deltaLat, lonP - deltaLon],
+      [latP + deltaLat, lonP + deltaLon],
+    ];
+    const tieneCaso = casosFiltrados.some((c) => c.parcela_id === p.id);
+    const rect = L.rectangle(bounds, {
+      color: tieneCaso ? "#ef4444" : "#10b981",
+      weight: tieneCaso ? 2 : 1.2,
+      fillColor: tieneCaso ? "#ef4444" : "#00c067",
+      fillOpacity: tieneCaso ? 0.28 : 0.12,
+    });
+    rect.bindTooltip(
+      `<b>${p.id} · ${p.nombre}</b><br/>${p.municipio} · ${p.cultivo} (${supHa} ha)${tieneCaso ? "<br/><span style='color:#ef4444; font-weight:700;'>⚠️ Caso activo</span>" : ""}`,
+      { direction: "top" }
+    );
+    if (tieneCaso) {
+      const casoP = casosFiltrados.find((c) => c.parcela_id === p.id);
+      if (casoP) {
+        rect.on("click", () => abrirModalExpediente(casoP.reporte_id));
+      }
+    }
+    rect.addTo(layerParcelasTec);
+  }
 
   // 1. Dibujar bases de técnicos si el toggle está activo
   if (estadoApp.mostrarBasesTecnicos) {
@@ -1064,7 +1177,13 @@ function renderizarTablaCasosNivel2(casosFiltrados) {
   if (!tbody) return;
 
   if (contador) {
-    contador.textContent = `Mostrando ${casosFiltrados.length} caso${casosFiltrados.length === 1 ? "" : "s"} (${estadoApp.incluirCasosPrevios ? "Nivel 2 + Históricos" : "Nivel 2 en vivo"})`;
+    if (estadoApp.filtroTecnico !== "todos") {
+      const tec = mapaTecnicos.get(estadoApp.filtroTecnico);
+      const parcelasVis = obtenerParcelasVisibles();
+      contador.textContent = `Técnico ${estadoApp.filtroTecnico} (${tec?.nombre || ""}) · ${casosFiltrados.length} caso${casosFiltrados.length === 1 ? "" : "s"} activos · ${parcelasVis.length} parcelas asignadas`;
+    } else {
+      contador.textContent = `Mostrando ${casosFiltrados.length} caso${casosFiltrados.length === 1 ? "" : "s"} · 264 parcelas bajo cobertura (Red Completa)`;
+    }
   }
 
   tbody.innerHTML = "";
@@ -1267,7 +1386,7 @@ function abrirModalExpediente(reporteId) {
   cuerpo.innerHTML = `
     <div class="modal-grid-2">
       <div class="modal-box">
-        <div class="sub-hint">CLASIFICACIÓN FITOSANITARIA NIVEL 2</div>
+        <div class="sub-hint">CLASIFICACIÓN FITOSANITARIA OFICIAL · IT GREEN</div>
         <div style="margin-top:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <span class="tag-sem tag-${caso.semaforo}">Semáforo ${caso.semaforo.toUpperCase()} (${caso.prioridad}/100 pts)</span>
           ${caso.brote ? `<span class="badge-brote-activo">🔥 BROTE EPIDEMIOLÓGICO (${vecinos.length + 1} casos &le;5 km)</span>` : `<span class="kpi-chip">Sin brote activo (${vecinos.length + 1}/3 casos &le;5 km)</span>`}
@@ -1400,6 +1519,11 @@ function poblarSelectoresCatalogo() {
       optT.textContent = `${t.id} · ${t.nombre} (${t.especialidad})`;
       filtroTecSel.appendChild(optT);
     }
+    const sesion = cargarSesion();
+    if (sesion && sesion.rol === "tecnico") {
+      filtroTecSel.value = sesion.id;
+      filtroTecSel.disabled = true;
+    }
   }
 }
 
@@ -1478,7 +1602,7 @@ function actualizarBannerVisitaParcela(parcelaId) {
           </div>
           <h4>${escaparHtml(nombreLegiblePlaga(casoActivo.plaga))} en cultivo de ${escaparHtml(p.cultivo)} · Semáforo ${sem} (${prioridadNum} pts)</h4>
           <p>
-            Atención prioritaria asignada a <strong>${tec ? `${escaparHtml(tec.nombre)} (${escaparHtml(tec.especialidad)} · Base ${escaparHtml(tec.base)})` : "Técnico especialista de la Junta Local"}</strong>.
+            Atención prioritaria asignada a <strong>${tec ? `${escaparHtml(tec.nombre)} (${escaparHtml(tec.especialidad)} · Base ${escaparHtml(tec.base)})` : "Especialista técnico de zona"}</strong>.
             ${casoActivo.brote ? " · ⚠️ <b>Alerta de Brote Zonal activa</b>." : ""}
             Favor de mantener libre acceso al predio.
           </p>
@@ -1664,6 +1788,7 @@ function renderizarCroquisParcela(p) {
     gFoco.appendChild(text);
 
     gFoco.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
       e.stopPropagation();
       focoSeleccionadoId = f.id;
       renderizarCroquisParcela(p);
@@ -1677,6 +1802,19 @@ function renderizarCroquisParcela(p) {
 }
 
 function iniciarArrastreFoco(e, foco, p) {
+  try {
+    e.preventDefault?.();
+    e.stopPropagation?.();
+  } catch (_) {}
+
+  const targetEl = e.currentTarget || e.target;
+  const pointerId = e.pointerId;
+  if (targetEl && typeof targetEl.setPointerCapture === "function") {
+    try {
+      targetEl.setPointerCapture(pointerId);
+    } catch (_) {}
+  }
+
   arrastrandoFoco = {
     foco,
     p,
@@ -1684,6 +1822,8 @@ function iniciarArrastreFoco(e, foco, p) {
     startClientY: e.clientY,
     origX: foco.x,
     origY: foco.y,
+    pointerId,
+    targetEl,
   };
 
   const svg = document.querySelector("#croquis-svg");
@@ -1691,6 +1831,9 @@ function iniciarArrastreFoco(e, foco, p) {
 
   const onPointerMove = (ev) => {
     if (!arrastrandoFoco) return;
+    try {
+      ev.preventDefault?.();
+    } catch (_) {}
     const rect = svg.getBoundingClientRect();
     const scaleX = 600 / rect.width;
     const scaleY = 380 / rect.height;
@@ -1709,13 +1852,20 @@ function iniciarArrastreFoco(e, foco, p) {
   };
 
   const onPointerUp = () => {
+    if (targetEl && typeof targetEl.releasePointerCapture === "function") {
+      try {
+        targetEl.releasePointerCapture(pointerId);
+      } catch (_) {}
+    }
     arrastrandoFoco = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
+    window.removeEventListener("pointercancel", onPointerUp);
   };
 
-  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointermove", onPointerMove, { passive: false });
   window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("pointercancel", onPointerUp);
 }
 
 function agregarFocoCroquis() {
@@ -2207,7 +2357,7 @@ function crearElementoMensaje(m) {
     img.addEventListener("click", () => {
       const w = window.open("", "_blank");
       if (w) {
-        w.document.title = "Evidencia Fotográfica - Alerta Plaga";
+        w.document.title = "Evidencia Fotográfica - IT green";
         w.document.body.style.margin = "0";
         w.document.body.style.backgroundColor = "#0b1320";
         w.document.body.style.display = "flex";
@@ -2451,8 +2601,24 @@ function limpiarAdjuntosChat() {
 function inicializarEventosPortalAgricultor() {
   // 1. Clic interactivo en el lienzo del croquis SVG para insertar nuevo foco
   const croquisSvg = document.querySelector("#croquis-svg");
+  const croquisWrapper = document.querySelector(".croquis-canvas-wrapper");
+
+  // Bloqueo estricto contra desplazamiento vertical / rebote de página en touchmove
+  const prevenirScrollCroquis = (e) => {
+    e.preventDefault();
+  };
+  croquisSvg?.addEventListener("touchmove", prevenirScrollCroquis, { passive: false });
+  croquisWrapper?.addEventListener("touchmove", prevenirScrollCroquis, { passive: false });
+
   croquisSvg?.addEventListener("click", (e) => {
-    if (e.target.id === "croquis-parcela-rect" || e.target.id === "croquis-svg" || e.target.tagName === "svg" || e.target.tagName === "rect") {
+    if (
+      e.target.id === "croquis-parcela-rect" ||
+      e.target.id === "croquis-satelite-img" ||
+      e.target.id === "croquis-svg" ||
+      e.target.tagName === "svg" ||
+      e.target.tagName === "rect" ||
+      e.target.tagName === "image"
+    ) {
       const p = estadoApp.parcelaActual;
       if (!p) return;
       const rect = croquisSvg.getBoundingClientRect();
@@ -2773,7 +2939,7 @@ function generarAudioTono() {
 
 
 // ============================================================================
-// BITÁCORA (SUPABASE + SERVIDOR + TABLAS EN VIVO)
+// BITÁCORA (SUPABASE + SERVIDOR + TABLAS FITOSANITARIAS)
 // ============================================================================
 async function cargarBitacora() {
   let registros = [];
@@ -2874,16 +3040,17 @@ function renderizarTablasBitacora() {
 
 function guardarEnColaOffline(entrada) {
   try {
-    const raw = localStorage.getItem("alerta_plaga_offline_cola");
+    const raw = localStorage.getItem("itgreen_offline_cola") || localStorage.getItem("alerta_plaga_offline_cola");
     const cola = raw ? JSON.parse(raw) : [];
     cola.push(entrada);
-    localStorage.setItem("alerta_plaga_offline_cola", JSON.stringify(cola));
+    localStorage.setItem("itgreen_offline_cola", JSON.stringify(cola));
+    localStorage.removeItem("alerta_plaga_offline_cola");
   } catch {}
 }
 
 async function sincronizarColaOffline() {
   try {
-    const raw = localStorage.getItem("alerta_plaga_offline_cola");
+    const raw = localStorage.getItem("itgreen_offline_cola") || localStorage.getItem("alerta_plaga_offline_cola");
     if (!raw) return;
     const cola = JSON.parse(raw);
     if (!Array.isArray(cola) || cola.length === 0) return;
@@ -2903,10 +3070,12 @@ async function sincronizarColaOffline() {
     }
 
     if (pendientes.length === 0) {
+      localStorage.removeItem("itgreen_offline_cola");
       localStorage.removeItem("alerta_plaga_offline_cola");
       mostrarToast("📶 Reportes guardados sin conexión sincronizados con éxito");
     } else {
-      localStorage.setItem("alerta_plaga_offline_cola", JSON.stringify(pendientes));
+      localStorage.setItem("itgreen_offline_cola", JSON.stringify(pendientes));
+      localStorage.removeItem("alerta_plaga_offline_cola");
     }
   } catch {}
 }
@@ -3011,10 +3180,19 @@ document.querySelector("#filtro-plaga-tec")?.addEventListener("change", (e) => {
   actualizarVistaTecnico();
 });
 document.querySelector("#filtro-tecnico-select")?.addEventListener("change", (e) => {
+  const sesion = cargarSesion();
+  if (sesion && sesion.rol === "tecnico") {
+    e.target.value = sesion.id;
+    return;
+  }
   estadoApp.filtroTecnico = e.target.value;
   actualizarVistaTecnico();
 });
 document.querySelector("#btn-limpiar-tecnico")?.addEventListener("click", () => {
+  const sesion = cargarSesion();
+  if (sesion && sesion.rol === "tecnico") {
+    return;
+  }
   estadoApp.filtroTecnico = "todos";
   const sel = document.querySelector("#filtro-tecnico-select");
   if (sel) sel.value = "todos";
@@ -3089,14 +3267,14 @@ document.querySelector("#btn-exportar-csv")?.addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `bitacora_alerta_plaga_${new Date().toLocaleDateString("en-CA")}.csv`;
+  a.download = `bitacora_itgreen_${new Date().toLocaleDateString("en-CA")}.csv`;
   a.click();
   URL.revokeObjectURL(url);
   mostrarToast("⬇️ Archivo CSV descargado");
 });
 
 // ============================================================================
-// SINCRONIZACIÓN EN VIVO CON EL SERVIDOR (/api/datos)
+// SINCRONIZACIÓN AUTOMÁTICA CON EL SERVIDOR (/api/datos)
 // ============================================================================
 async function sincronizarDatosEnVivo(mostrarNotificacion = false) {
   const pill = document.querySelector("#indicador-en-vivo");
@@ -3131,7 +3309,7 @@ async function sincronizarDatosEnVivo(mostrarNotificacion = false) {
       renderizarFeedAvisosOficiales();
       renderizarTablasBitacora();
       if (mostrarNotificacion) {
-        mostrarToast(`🔄 Sincronizado: ${estadoApp.casosHistorial.length} casos Nivel 2 activos`);
+        mostrarToast(`🔄 Sincronizado: ${estadoApp.casosHistorial.length} casos fitosanitarios activos`);
       }
     }
     await sincronizarColaOffline();
@@ -3173,6 +3351,7 @@ function iniciarPanel() {
 
   // Purga defensiva inicial de cualquier residuo previo en localStorage
   try {
+    localStorage.removeItem("itgreen_sesion");
     localStorage.removeItem("alerta_plaga_sesion");
   } catch {}
 
