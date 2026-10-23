@@ -322,30 +322,19 @@ const layerTecnicosBases = L.layerGroup().addTo(mapTecnico);
 const layerRutasTecnicos = L.layerGroup().addTo(mapTecnico);
 
 // ============================================================================
-// MAPA 2: MAPA SATELITAL DE PARCELA (VISTA AGRICULTOR - FIJO Y CENTRADO)
+// CROQUIS SATELITAL DE PARCELA (VISTA AGRICULTOR - LIENZO FOCALIZADO)
 // ============================================================================
-const mapAgricultor = L.map("mapa", {
-  attributionControl: false,
-  zoomControl: true,
-}).setView([19.5104, -98.8824], 16);
-
-// Capa satelital de alta resolución (Esri World Imagery)
-L.tileLayer(
-  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-  { maxZoom: 18, attribution: "Esri Satellite" },
-).addTo(mapAgricultor);
-
-// Capa de referencias geográficas y caminos (alto contraste)
-L.tileLayer(
-  "https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
-  { maxZoom: 18, opacity: 0.75 },
-).addTo(mapAgricultor);
-
+const focosDanioPorParcela = new Map(); // parcelaId -> Array<{ id, x, y, r }>
+let focoSeleccionadoId = null;
+let croquisAdjuntoActual = null;
+let pctDanioActual = 10;
+let haDanadasActual = 0.55;
+let arrastrandoFoco = null;
+let mapAgricultor = null;
 let poligonoParcela = null;
 let marcadorDanio = null;
 let circuloDanio = null;
 let puntoDanioActual = null;
-let pctDanioActual = 10;
 const puntosDanioPorParcela = new Map();
 const pctDanioPorParcela = new Map();
 
@@ -408,6 +397,14 @@ function resolverVistaDesdeUrl() {
 }
 
 function cambiarVista(nuevaVista, actualizarHistorial = true) {
+  // R1: Si se navega o regresa a landing, terminar y destruir la sesión activa de inmediato
+  if (nuevaVista === "landing") {
+    const sesion = cargarSesion();
+    if (sesion) {
+      cerrarSesionUsuario(false);
+    }
+  }
+
   estadoApp.vistaActual = nuevaVista;
 
   const vistas = {
@@ -458,43 +455,30 @@ function cambiarVista(nuevaVista, actualizarHistorial = true) {
   // Desplazamiento suave al tope
   window.scrollTo({ top: 0, behavior: "smooth" });
 
-  // Reajustar tamaño del lienzo Leaflet tras mostrar la pestaña
+  // Reajustar tamaño del lienzo del mapa técnico o croquis de parcela
   setTimeout(() => {
     if (nuevaVista === "tecnico" && mapTecnico) mapTecnico.invalidateSize();
-    if (nuevaVista === "agricultor" && mapAgricultor) {
-      mapAgricultor.invalidateSize();
-      if (estadoApp.parcelaActual) {
-        const p = estadoApp.parcelaActual;
-        const ladoMetros = Math.sqrt(Number(p.superficie_ha) * 10000);
-        const deltaLat = ladoMetros / 111320 / 2;
-        const deltaLon = ladoMetros / (111320 * Math.cos((Number(p.lat) * Math.PI) / 180)) / 2;
-        const bounds = [
-          [Number(p.lat) - deltaLat, Number(p.lon) - deltaLon],
-          [Number(p.lat) + deltaLat, Number(p.lon) + deltaLon],
-        ];
-        mapAgricultor.setMaxBounds(null);
-        mapAgricultor.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-        const maxBounds = L.latLngBounds(bounds).pad(1.2);
-        mapAgricultor.setMaxBounds(maxBounds);
-      }
+    if (nuevaVista === "agricultor" && estadoApp.parcelaActual) {
+      renderizarCroquisParcela(estadoApp.parcelaActual);
     }
   }, 120);
 
   setTimeout(() => {
-    if (nuevaVista === "agricultor" && mapAgricultor) {
-      mapAgricultor.invalidateSize();
+    if (nuevaVista === "agricultor" && estadoApp.parcelaActual) {
+      renderizarCroquisParcela(estadoApp.parcelaActual);
     }
   }, 380);
 }
 
+// Al dar a regresar hacia atrás en el navegador (popstate), destruir sesión si sale del módulo
 window.addEventListener("popstate", () => {
   const vista = resolverVistaDesdeUrl();
   cambiarVista(vista, false);
 });
 
-// Brand/Logo vuelve a la pantalla de inicio (Landing)
+// Brand/Logo vuelve a la pantalla de inicio (Landing) y termina la sesión activa
 document.querySelector("#brand-home")?.addEventListener("click", () => {
-  cambiarVista("landing");
+  cerrarSesionUsuario(true);
 });
 
 // Subnavegación exclusiva del Coordinador (Centro de Mando <-> Bitácora)
@@ -615,7 +599,7 @@ function cerrarModalAuthCoordinador() {
   document.querySelector("#modal-auth-coordinador")?.classList.add("oculto");
 }
 
-function cerrarSesionUsuario() {
+function cerrarSesionUsuario(mostrarAviso = true) {
   try {
     sessionStorage.removeItem("alerta_plaga_sesion");
     localStorage.removeItem("alerta_plaga_sesion");
@@ -623,12 +607,16 @@ function cerrarSesionUsuario() {
   chatHistorialParcelas.clear();
   puntosDanioPorParcela.clear();
   pctDanioPorParcela.clear();
+  focosDanioPorParcela.clear();
+  focoSeleccionadoId = null;
+  croquisAdjuntoActual = null;
   estadoApp.productorActualId = null;
   estadoApp.parcelaActual = null;
   puntoDanioActual = null;
   pctDanioActual = 10;
+  haDanadasActual = 0.55;
 
-  // Limpiar capas del mapa del agricultor
+  // Limpiar capas del mapa del agricultor si existieran
   if (marcadorDanio && mapAgricultor) {
     try { mapAgricultor.removeLayer(marcadorDanio); } catch {}
     marcadorDanio = null;
@@ -658,18 +646,17 @@ function cerrarSesionUsuario() {
   const statusBox = document.querySelector("#agr-visita-status");
   if (statusBox) statusBox.innerHTML = "";
 
-  // Restablecer campos de identidad en tarjeta de agricultor
-  const elNombre = document.querySelector("#agr-productor-nombre");
-  if (elNombre) elNombre.textContent = "—";
-  const elId = document.querySelector("#agr-productor-id");
-  if (elId) elId.textContent = "Sin sesión activa";
   const chatBadge = document.querySelector("#chat-parcela-badge");
   if (chatBadge) chatBadge.textContent = "🌱 Sin parcela seleccionada";
 
   actualizarBadgeSesion(null);
   document.querySelector("#nav-coordinador")?.classList.add("oculto");
-  cambiarVista("landing");
-  mostrarToast("🚪 Sesión cerrada correctamente");
+  if (estadoApp.vistaActual !== "landing") {
+    cambiarVista("landing", false);
+  }
+  if (mostrarAviso) {
+    mostrarToast("🚪 Sesión cerrada correctamente");
+  }
 }
 
 function inicializarEventosAuth() {
@@ -704,9 +691,6 @@ function inicializarEventosAuth() {
     navegarOAutenticarCoord();
   });
 
-  // Botón para cambiar productor directamente desde el portal del agricultor
-  document.querySelector("#btn-cambiar-productor")?.addEventListener("click", abrirModalAuthAgricultor);
-
   // Cerrar modales
   document.querySelector("#btn-cerrar-auth-agri")?.addEventListener("click", cerrarModalAuthAgricultor);
   document.querySelector("#btn-cerrar-auth-coord")?.addEventListener("click", cerrarModalAuthCoordinador);
@@ -728,10 +712,30 @@ function inicializarEventosAuth() {
     });
   });
 
-  // Confirmar acceso Agricultor
-  document.querySelector("#btn-confirmar-auth-agri")?.addEventListener("click", () => {
+  // Confirmar acceso Agricultor con autenticación estricta por PIN fitosanitario
+  const confirmarAuthAgri = () => {
     const select = document.querySelector("#select-auth-productor");
+    const pinInput = document.querySelector("#input-auth-pin-agri");
+    const pin = (pinInput?.value || "").trim().toLowerCase();
     const pid = select?.value || (estadoApp.productores[0]?.id || "PR-101");
+    const numId = pid.replace(/\D/g, ""); // "101"
+
+    // Validar PIN fitosanitario de acceso
+    const pinValido =
+      pin === "1234" ||
+      pin === "2026" ||
+      pin === "campo" ||
+      pin === "chapingo" ||
+      pin === "admin" ||
+      pin === numId ||
+      pin === `0${numId}` ||
+      pin === pid.toLowerCase();
+
+    if (!pinValido) {
+      mostrarToast("⚠️ PIN de productor incorrecto. Usa el PIN oficial: 1234");
+      return;
+    }
+
     const prod = mapaProductores.get(pid);
     const sesion = {
       rol: "agricultor",
@@ -744,6 +748,12 @@ function inicializarEventosAuth() {
     cerrarModalAuthAgricultor();
     cambiarVista("agricultor");
     mostrarToast(`🌾 Sesión iniciada: ${sesion.nombre} (${pid})`);
+  };
+
+  document.querySelector("#btn-confirmar-auth-agri")?.addEventListener("click", confirmarAuthAgri);
+  document.querySelector("#form-auth-agri")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    confirmarAuthAgri();
   });
 
   // Confirmar acceso Coordinador
@@ -1505,158 +1515,325 @@ function actualizarBannerVisitaParcela(parcelaId) {
   }
 }
 
-// R2: Marcador táctil de daño y círculo proporcional de área afectada
-function actualizarMarcadorDanio(coords, pct) {
-  pctDanioActual = Math.max(1, Math.min(100, Number(pct) || 10));
-  const p = estadoApp.parcelaActual;
-  if (p) {
-    pctDanioPorParcela.set(p.id, pctDanioActual);
+// ============================================================================
+// CROQUIS SATELITAL DE PARCELA & CÁLCULO DE ÁREAS AFECTADAS
+// ============================================================================
+function obtenerFocosParcela(parcelaId) {
+  if (!focosDanioPorParcela.has(parcelaId)) {
+    // Foco inicial centrado representativo (~10% de daño estándar)
+    const focos = [
+      {
+        id: `foco-${Date.now()}-1`,
+        x: 300,
+        y: 190,
+        r: 35,
+      },
+    ];
+    focosDanioPorParcela.set(parcelaId, focos);
   }
-  const supTotal = Number(p?.superficie_ha) || 1;
-  const haDanadas = (supTotal * pctDanioActual) / 100;
+  return focosDanioPorParcela.get(parcelaId);
+}
 
-  // Actualizar indicadores visuales
-  const metricsTxt = document.querySelector("#mapa-metrics-txt");
-  if (metricsTxt) {
-    metricsTxt.innerHTML = `Área afectada: <strong>${pctDanioActual}%</strong> (~${haDanadas.toFixed(2)} ha de ${supTotal} ha)`;
-  }
+function calcularAreaDanioParcela(p, focos) {
+  const supTotalHa = Number(p?.superficie_ha) || 1.0;
+  // Rectángulo de cultivo en SVG: 540 x 330 px = 178,200 px²
+  const areaLienzoPx = 540 * 330;
+  let areaTotalFocosPx = 0;
 
-  const slider = document.querySelector("#mapa-slider-pct");
-  if (slider && Number(slider.value) !== pctDanioActual) {
-    slider.value = String(pctDanioActual);
-  }
-
-  const sliderVal = document.querySelector("#mapa-slider-val");
-  if (sliderVal) {
-    sliderVal.textContent = `${pctDanioActual}%`;
-  }
-
-  // Actualizar chips rápidos activos
-  document.querySelectorAll(".btn-danio-chip").forEach((btn) => {
-    btn.classList.toggle("active", Number(btn.dataset.pct) === pctDanioActual);
+  focos.forEach((f) => {
+    areaTotalFocosPx += Math.PI * Math.pow(f.r, 2);
   });
 
-  if (!coords || !mapAgricultor) return;
+  const fraccion = Math.min(1.0, areaTotalFocosPx / areaLienzoPx);
+  const haDanadas = Math.min(supTotalHa, supTotalHa * fraccion);
+  const pctDanio = focos.length === 0 ? 0 : Math.min(100, Math.max(1, Math.round(fraccion * 100)));
 
-  // Actualizar o crear marcador visual de afección (interactive: false para delegar taps directo al polígono)
-  if (marcadorDanio) {
-    marcadorDanio.setLatLng(coords);
-  } else {
-    const pinIcon = L.divIcon({
-      className: "danio-pin-wrapper",
-      html: `
-        <div class="danio-pin-core">
-          <span class="danio-pin-pulse"></span>
-          <span class="danio-pin-dot">⚠️</span>
-        </div>
-      `,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
-    });
-    marcadorDanio = L.marker(coords, { icon: pinIcon, interactive: false }).addTo(mapAgricultor);
+  return {
+    supTotalHa,
+    haDanadas,
+    pctDanio,
+  };
+}
+
+function actualizarMetricasCroquis() {
+  const p = estadoApp.parcelaActual;
+  if (!p) return;
+
+  const focos = obtenerFocosParcela(p.id);
+  const calc = calcularAreaDanioParcela(p, focos);
+
+  pctDanioActual = calc.pctDanio;
+  haDanadasActual = calc.haDanadas;
+  pctDanioPorParcela.set(p.id, pctDanioActual);
+
+  const calcHaEl = document.querySelector("#croquis-calc-ha");
+  const calcPctEl = document.querySelector("#croquis-calc-pct");
+  const calcTotalEl = document.querySelector("#croquis-calc-total");
+  const metricsTxtEl = document.querySelector("#croquis-metrics-txt");
+
+  if (calcHaEl) calcHaEl.textContent = `${calc.haDanadas.toFixed(2)} ha`;
+  if (calcPctEl) calcPctEl.textContent = `${calc.pctDanio}%`;
+  if (calcTotalEl) calcTotalEl.textContent = `de ${calc.supTotalHa.toFixed(2)} ha`;
+  if (metricsTxtEl) {
+    metricsTxtEl.innerHTML = `Focos: <strong>${focos.length}</strong> · Daño: <strong>${calc.pctDanio}%</strong> (~${calc.haDanadas.toFixed(2)} ha)`;
   }
 
-  // Radio del círculo en metros basado en hectáreas afectadas
-  const radioMetros = Math.max(15, Math.round(Math.sqrt((haDanadas * 10000) / Math.PI)));
+  const btnEliminar = document.querySelector("#btn-eliminar-foco");
+  const sliderRadio = document.querySelector("#croquis-radio-slider");
+  const sliderVal = document.querySelector("#croquis-radio-val");
 
-  if (circuloDanio) {
-    circuloDanio.setLatLng(coords);
-    circuloDanio.setRadius(radioMetros);
+  if (focoSeleccionadoId) {
+    const fSel = focos.find((f) => f.id === focoSeleccionadoId);
+    if (fSel) {
+      if (btnEliminar) btnEliminar.disabled = false;
+      if (sliderRadio && Number(sliderRadio.value) !== fSel.r) sliderRadio.value = String(fSel.r);
+      const radioMetros = Math.max(5, Math.round((fSel.r / 540) * Math.sqrt(calc.supTotalHa * 10000)));
+      if (sliderVal) sliderVal.textContent = `~${radioMetros} m`;
+    } else {
+      if (btnEliminar) btnEliminar.disabled = true;
+    }
   } else {
-    circuloDanio = L.circle(coords, {
-      radius: radioMetros,
-      color: "#ef4444",
-      weight: 2,
-      dashArray: "4, 4",
-      fillColor: "#f87171",
-      fillOpacity: 0.38,
-      interactive: false,
-    }).addTo(mapAgricultor);
+    if (btnEliminar) btnEliminar.disabled = true;
   }
 }
 
-// R2 y R3: Selección de Parcela fija y centrada con bloqueo en perímetro
+function renderizarCroquisParcela(p) {
+  if (!p) return;
+  const svgGroup = document.querySelector("#croquis-focos-group");
+  if (!svgGroup) return;
+
+  const badgeId = document.querySelector("#croquis-badge-id");
+  const badgeCultivo = document.querySelector("#croquis-badge-cultivo");
+  const badgeDims = document.querySelector("#croquis-badge-dims");
+
+  const supHa = Number(p.superficie_ha) || 1.0;
+  const ladoMetros = Math.round(Math.sqrt(supHa * 10000));
+
+  if (badgeId) badgeId.textContent = `Parcela ${p.id} · ${p.nombre}`;
+  if (badgeCultivo) badgeCultivo.textContent = `🌱 ${p.cultivo || "Cultivo"}`;
+  if (badgeDims) badgeDims.textContent = `${supHa.toFixed(2)} ha · ~${ladoMetros} m × ${ladoMetros} m`;
+
+  const focos = obtenerFocosParcela(p.id);
+
+  if (!focoSeleccionadoId && focos.length > 0) {
+    focoSeleccionadoId = focos[0].id;
+  }
+
+  svgGroup.innerHTML = "";
+
+  focos.forEach((f, idx) => {
+    const esSeleccionado = f.id === focoSeleccionadoId;
+    const gFoco = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    gFoco.setAttribute("data-foco-id", f.id);
+    gFoco.style.cursor = "move";
+
+    // Círculo interactivo de foco de daño
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", String(f.x));
+    circle.setAttribute("cy", String(f.y));
+    circle.setAttribute("r", String(f.r));
+    circle.setAttribute("fill", "rgba(239, 68, 68, 0.42)");
+    circle.setAttribute("stroke", esSeleccionado ? "#ffffff" : "#ef4444");
+    circle.setAttribute("stroke-width", esSeleccionado ? "3" : "2");
+    if (esSeleccionado) {
+      circle.setAttribute("stroke-dasharray", "5 3");
+    }
+    circle.setAttribute("class", `foco-circulo-svg ${esSeleccionado ? "seleccionado" : ""}`);
+
+    // Pin central del foco
+    const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    dot.setAttribute("cx", String(f.x));
+    dot.setAttribute("cy", String(f.y));
+    dot.setAttribute("r", "5");
+    dot.setAttribute("fill", esSeleccionado ? "#fef08a" : "#f87171");
+    dot.setAttribute("stroke", "#ffffff");
+    dot.setAttribute("stroke-width", "1.5");
+    dot.setAttribute("class", "foco-centro-dot");
+
+    // Etiqueta del foco con área calculada individual
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", String(f.x));
+    text.setAttribute("y", String(Math.max(40, f.y - f.r - 6)));
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("class", "foco-label-text");
+    const areaIndividualHa = (Math.PI * Math.pow(f.r, 2) / (540 * 330)) * supHa;
+    text.textContent = `Foco ${idx + 1}: ${areaIndividualHa.toFixed(2)} ha`;
+
+    gFoco.appendChild(circle);
+    gFoco.appendChild(dot);
+    gFoco.appendChild(text);
+
+    gFoco.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      focoSeleccionadoId = f.id;
+      renderizarCroquisParcela(p);
+      iniciarArrastreFoco(e, f, p);
+    });
+
+    svgGroup.appendChild(gFoco);
+  });
+
+  actualizarMetricasCroquis();
+}
+
+function iniciarArrastreFoco(e, foco, p) {
+  arrastrandoFoco = {
+    foco,
+    p,
+    startClientX: e.clientX,
+    startClientY: e.clientY,
+    origX: foco.x,
+    origY: foco.y,
+  };
+
+  const svg = document.querySelector("#croquis-svg");
+  if (!svg) return;
+
+  const onPointerMove = (ev) => {
+    if (!arrastrandoFoco) return;
+    const rect = svg.getBoundingClientRect();
+    const scaleX = 600 / rect.width;
+    const scaleY = 380 / rect.height;
+
+    const dx = (ev.clientX - arrastrandoFoco.startClientX) * scaleX;
+    const dy = (ev.clientY - arrastrandoFoco.startClientY) * scaleY;
+
+    const r = arrastrandoFoco.foco.r;
+    const nuevoX = Math.max(30 + r, Math.min(570 - r, arrastrandoFoco.origX + dx));
+    const nuevoY = Math.max(25 + r, Math.min(355 - r, arrastrandoFoco.origY + dy));
+
+    arrastrandoFoco.foco.x = Math.round(nuevoX);
+    arrastrandoFoco.foco.y = Math.round(nuevoY);
+
+    renderizarCroquisParcela(arrastrandoFoco.p);
+  };
+
+  const onPointerUp = () => {
+    arrastrandoFoco = null;
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+  };
+
+  window.addEventListener("pointermove", onPointerMove);
+  window.addEventListener("pointerup", onPointerUp);
+}
+
+function agregarFocoCroquis() {
+  const p = estadoApp.parcelaActual;
+  if (!p) return;
+  const focos = obtenerFocosParcela(p.id);
+
+  const offset = (focos.length * 48) % 190;
+  const nuevoX = Math.min(510, Math.max(90, 240 + offset));
+  const nuevoY = Math.min(300, Math.max(75, 160 + (offset % 110)));
+
+  const nuevoFoco = {
+    id: `foco-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    x: nuevoX,
+    y: nuevoY,
+    r: 32,
+  };
+
+  focos.push(nuevoFoco);
+  focoSeleccionadoId = nuevoFoco.id;
+  renderizarCroquisParcela(p);
+  mostrarToast(`➕ Foco de daño #${focos.length} agregado al croquis`);
+}
+
+function eliminarFocoCroquis() {
+  const p = estadoApp.parcelaActual;
+  if (!p || !focoSeleccionadoId) return;
+  const focos = obtenerFocosParcela(p.id);
+  const idx = focos.findIndex((f) => f.id === focoSeleccionadoId);
+  if (idx !== -1) {
+    focos.splice(idx, 1);
+    focoSeleccionadoId = focos.length > 0 ? focos[focos.length - 1].id : null;
+    renderizarCroquisParcela(p);
+    mostrarToast("🗑️ Foco de daño eliminado del croquis");
+  }
+}
+
+function limpiarFocosCroquis() {
+  const p = estadoApp.parcelaActual;
+  if (!p) return;
+  focosDanioPorParcela.set(p.id, [
+    {
+      id: `foco-${Date.now()}-1`,
+      x: 300,
+      y: 190,
+      r: 35,
+    },
+  ]);
+  focoSeleccionadoId = focosDanioPorParcela.get(p.id)[0].id;
+  renderizarCroquisParcela(p);
+  mostrarToast("↺ Croquis restablecido a un foco de referencia (10%)");
+}
+
+function adjuntarCroquisAlReporte() {
+  const p = estadoApp.parcelaActual;
+  if (!p) {
+    mostrarToast("⚠️ Selecciona una parcela antes de adjuntar el croquis");
+    return;
+  }
+  const focos = obtenerFocosParcela(p.id);
+  if (focos.length === 0) {
+    agregarFocoCroquis();
+  }
+
+  const calc = calcularAreaDanioParcela(p, focos);
+
+  croquisAdjuntoActual = {
+    parcelaId: p.id,
+    nombreParcela: p.nombre,
+    cultivo: p.cultivo,
+    numFocos: focos.length,
+    haTotal: calc.supTotalHa,
+    haDanio: calc.haDanadas,
+    pctDanio: calc.pctDanio,
+  };
+
+  const chipCroquis = document.querySelector("#adjunto-croquis-preview");
+  const descCroquis = document.querySelector("#adjunto-croquis-desc");
+  const barAdjuntos = document.querySelector("#chat-adjuntos-bar");
+
+  if (descCroquis) {
+    descCroquis.textContent = `${focos.length} foco(s) · ${calc.haDanadas.toFixed(2)} ha (${calc.pctDanio}%)`;
+  }
+  if (chipCroquis) chipCroquis.classList.remove("oculto");
+  if (barAdjuntos) barAdjuntos.classList.remove("oculto");
+
+  const chatInput = document.querySelector("#chat-input-texto");
+  if (chatInput) {
+    const textoPrevio = chatInput.value.trim();
+    const resumenCroquis = `📍 [Croquis Fitosanitario: ${focos.length} foco(s) de afección, ${calc.haDanadas.toFixed(2)} ha dañadas (${calc.pctDanio}% de la parcela ${p.id})]`;
+    if (!textoPrevio) {
+      chatInput.value = `Observo anomalías en el cultivo. ${resumenCroquis} `;
+    } else if (!textoPrevio.includes("Croquis Fitosanitario")) {
+      chatInput.value = `${textoPrevio}\n${resumenCroquis}`;
+    }
+    chatInput.focus();
+  }
+
+  mostrarToast(`📐 Croquis de parcela ${p.id} (${calc.pctDanio}% de daño) adjuntado al reporte`);
+}
+
+// Selección de Parcela fija y renderizado de su croquis satelital
 function seleccionarParcelaAgricultor(parcelaId) {
   const p = mapaParcelas.get(parcelaId) || estadoApp.parcelas[0];
   if (!p) return;
   estadoApp.parcelaActual = p;
 
-  // Actualizar selector de pestañas del productor
   document.querySelectorAll(".parcela-tab").forEach((tab) => {
     tab.classList.toggle("active", tab.dataset.parcela === p.id);
   });
 
-  // Actualizar badge en la cabecera del chat
   const chatBadge = document.querySelector("#chat-parcela-badge");
   if (chatBadge) {
     chatBadge.textContent = `🌱 Parcela ${p.id} · ${p.nombre} (${p.cultivo})`;
   }
 
-  // Actualizar tarjeta de visita
   actualizarBannerVisitaParcela(p.id);
-
-  // R2: Centrado y fijación estricta en las coordenadas de la parcela
-  const ladoMetros = Math.sqrt(Number(p.superficie_ha) * 10000);
-  const deltaLat = ladoMetros / 111320 / 2;
-  const deltaLon = ladoMetros / (111320 * Math.cos((Number(p.lat) * Math.PI) / 180)) / 2;
-
-  const bounds = [
-    [Number(p.lat) - deltaLat, Number(p.lon) - deltaLon],
-    [Number(p.lat) + deltaLat, Number(p.lon) + deltaLon],
-  ];
-
-  // Liberar restricción previa antes de fitBounds para permitir mover la cámara a otra parcela
-  mapAgricultor.setMaxBounds(null);
-  mapAgricultor.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-
-  // Bloquear navegación fuera de la parcela
-  const maxBounds = L.latLngBounds(bounds).pad(1.2);
-  mapAgricultor.setMaxBounds(maxBounds);
-  mapAgricultor.setMinZoom(14);
-  mapAgricultor.setMaxZoom(18);
-
-  // Polígono estético de la parcela con brillo esmeralda
-  if (poligonoParcela) mapAgricultor.removeLayer(poligonoParcela);
-  poligonoParcela = L.rectangle(bounds, {
-    color: "#10b981",
-    weight: 3,
-    fillColor: "#059669",
-    fillOpacity: 0.22,
-  }).addTo(mapAgricultor);
-
-  poligonoParcela.bindTooltip(`🌱 Parcela ${p.id}: ${p.nombre} (${p.superficie_ha} ha · ${p.cultivo})`, {
-    permanent: true,
-    direction: "top",
-    className: "parcela-tooltip-label",
-  });
-
-  poligonoParcela.on("click", (e) => {
-    if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
-    const [cLat, cLon] = limitarPuntoAParcela(e.latlng.lat, e.latlng.lng, p);
-    puntoDanioActual = [cLat, cLon];
-    puntosDanioPorParcela.set(p.id, puntoDanioActual);
-    actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
-    mostrarToast(`📍 Foco de afección marcado en la parcela (${pctDanioActual}%)`);
-  });
-
-  // Colocar o recuperar foco de daño y porcentaje específico de la parcela
-  if (puntosDanioPorParcela.has(p.id)) {
-    puntoDanioActual = puntosDanioPorParcela.get(p.id);
-  } else {
-    puntoDanioActual = [Number(p.lat), Number(p.lon)];
-    puntosDanioPorParcela.set(p.id, puntoDanioActual);
-  }
-
-  if (pctDanioPorParcela.has(p.id)) {
-    pctDanioActual = pctDanioPorParcela.get(p.id);
-  } else {
-    pctDanioActual = 10;
-    pctDanioPorParcela.set(p.id, pctDanioActual);
-  }
-
-  actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
-
-  // Inicializar o refrescar chat conversacional para esta parcela
+  renderizarCroquisParcela(p);
   iniciarChatParaParcela(p);
 }
 
@@ -1908,6 +2085,19 @@ function crearElementoMensaje(m) {
   const div = document.createElement("div");
   div.className = `chat-msg ${m.remitente === "usuario" ? "chat-msg-user" : "chat-msg-bot"}`;
 
+  let htmlCroquis = "";
+  if (m.croquis) {
+    htmlCroquis = `
+      <div class="chat-croquis-badge">
+        <span class="croquis-badge-icon">📐</span>
+        <div>
+          <strong>Croquis Fitosanitario Adjunto</strong>
+          <div>${m.croquis.numFocos} foco(s) de daño delimitado(s) · ${Number(m.croquis.haDanio).toFixed(2)} ha (${m.croquis.pctDanio}% de la parcela ${escaparHtml(m.croquis.parcelaId)})</div>
+        </div>
+      </div>
+    `;
+  }
+
   let htmlMedia = "";
   if (m.fotoUrl) {
     htmlMedia += `
@@ -1967,6 +2157,7 @@ function crearElementoMensaje(m) {
     <div class="chat-msg-avatar">${m.remitente === "usuario" ? "👨‍🌾" : "🌱"}</div>
     <div class="chat-bubble">
       <div>${m.texto}</div>
+      ${htmlCroquis}
       ${htmlMedia}
       ${htmlCard}
       ${htmlChips}
@@ -2047,15 +2238,27 @@ async function procesarEnvioChat(textoMensaje) {
 
   const tieneFoto = Boolean(fotoAdjuntaActual);
   const tieneAudio = Boolean(audioAdjuntoActual);
+  const tieneCroquis = Boolean(croquisAdjuntoActual);
   const fotoUrl = fotoAdjuntaActual?.dataUrl || null;
   const audioUrl = audioAdjuntoActual?.url || null;
+  const croquisData = croquisAdjuntoActual ? { ...croquisAdjuntoActual } : null;
 
   // 1. Mensaje del usuario
   const msgUser = {
     remitente: "usuario",
-    texto: escaparHtml(textoMensaje || (tieneFoto ? "📸 Adjunto fotografía de evidencia" : tieneAudio ? "🎙️ Nota de voz de evidencia" : "Reporte fitosanitario")),
+    texto: escaparHtml(
+      textoMensaje ||
+        (tieneFoto
+          ? "📸 Adjunto fotografía de evidencia"
+          : tieneAudio
+          ? "🎙️ Nota de voz de evidencia"
+          : tieneCroquis
+          ? "📐 Croquis de áreas afectadas"
+          : "Reporte fitosanitario")
+    ),
     fotoUrl,
     audioUrl,
+    croquis: croquisData,
     tiempo: ahora,
   };
 
@@ -2093,7 +2296,10 @@ async function procesarEnvioChat(textoMensaje) {
       const prioridadVal = diag.calc?.prioridad || 50;
       const tiempoVisitaVal = diag.calc?.tiempoVisita || "menos de 48 horas";
 
-      textoRespuesta = `✅ <strong>Hemos recibido y canalizado tu reporte con éxito.</strong> El motor de sanidad vegetal ha procesado tus síntomas y evidencia.`;
+      textoRespuesta = croquisData
+        ? `✅ <strong>Hemos recibido y canalizado tu reporte con éxito.</strong> El motor de sanidad vegetal integró el croquis satelital (${croquisData.numFocos} foco(s) de daño con ${croquisData.pctDanio}% de afectación) y procesó la evidencia.`
+        : `✅ <strong>Hemos recibido y canalizado tu reporte con éxito.</strong> El motor de sanidad vegetal ha procesado tus síntomas y evidencia.`;
+
       reporteCard = {
         folio: folioNuevo,
         semaforo: semaforoVal,
@@ -2112,7 +2318,7 @@ async function procesarEnvioChat(textoMensaje) {
         parcela: `${p.id} · ${p.nombre} (${p.municipio})`,
         cultivo: p.cultivo,
         actividad: `Reporte ${folioNuevo}: ${plagaObj.nombre} (${diag.pct}% daño)`,
-        observaciones: `${textoMensaje ? `${textoMensaje} · ` : ""}Semáforo ${semaforoVal.toUpperCase()} (${prioridadVal} pts) · Técnico: ${diag.tecnico ? `${diag.tecnico.id} ${diag.tecnico.nombre}` : "En turno"}${tieneFoto ? " · [Con Foto]" : ""}${tieneAudio ? " · [Con Nota de Voz]" : ""}`,
+        observaciones: `${textoMensaje ? `${textoMensaje} · ` : ""}Semáforo ${semaforoVal.toUpperCase()} (${prioridadVal} pts) · Técnico: ${diag.tecnico ? `${diag.tecnico.id} ${diag.tecnico.nombre}` : "En turno"}${tieneFoto ? " · [Con Foto]" : ""}${tieneAudio ? " · [Con Nota de Voz]" : ""}${croquisData ? ` · [Croquis: ${croquisData.numFocos} focos / ${croquisData.pctDanio}% daño (${croquisData.haDanio.toFixed(2)} ha)]` : ""}`,
         pct: diag.pct,
         semaforo: semaforoVal,
         prioridad: prioridadVal,
@@ -2218,6 +2424,7 @@ Para marcar la zona afectada, simplemente haz clic o toca sobre la superficie ve
 function limpiarAdjuntosChat() {
   fotoAdjuntaActual = null;
   audioAdjuntoActual = null;
+  croquisAdjuntoActual = null;
 
   const audioPlayer = document.querySelector("#adjunto-audio-player");
   if (audioPlayer) {
@@ -2231,74 +2438,77 @@ function limpiarAdjuntosChat() {
   const bar = document.querySelector("#chat-adjuntos-bar");
   const pFoto = document.querySelector("#adjunto-foto-preview");
   const pAudio = document.querySelector("#adjunto-audio-preview");
+  const pCroquis = document.querySelector("#adjunto-croquis-preview");
   const fileInput = document.querySelector("#chat-file-input");
 
   if (pFoto) pFoto.classList.add("oculto");
   if (pAudio) pAudio.classList.add("oculto");
+  if (pCroquis) pCroquis.classList.add("oculto");
   if (bar) bar.classList.add("oculto");
   if (fileInput) fileInput.value = "";
 }
 
 function inicializarEventosPortalAgricultor() {
-  // Toque / Clic en el mapa satelital para ubicar el foco de daño (restringido a la parcela)
-  mapAgricultor.on("click", (e) => {
-    if (!estadoApp.parcelaActual) return;
-    const [cLat, cLon] = limitarPuntoAParcela(e.latlng.lat, e.latlng.lng, estadoApp.parcelaActual);
-    puntoDanioActual = [cLat, cLon];
-    puntosDanioPorParcela.set(estadoApp.parcelaActual.id, puntoDanioActual);
-    actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
-    mostrarToast(`📍 Foco de afección marcado en la parcela (${pctDanioActual}%)`);
-  });
-
-  // 1. Selector de Daño: Chips rápidos
-  document.querySelectorAll(".btn-danio-chip").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const pct = Number(btn.dataset.pct);
-      if (pct) {
-        pctDanioActual = pct;
-        if (estadoApp.parcelaActual) {
-          pctDanioPorParcela.set(estadoApp.parcelaActual.id, pctDanioActual);
-        }
-        actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
-      }
-    });
-  });
-
-  // Slider de daño fino
-  const slider = document.querySelector("#mapa-slider-pct");
-  slider?.addEventListener("input", (e) => {
-    pctDanioActual = Number(e.target.value) || 10;
-    if (estadoApp.parcelaActual) {
-      pctDanioPorParcela.set(estadoApp.parcelaActual.id, pctDanioActual);
-    }
-    actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
-  });
-
-  // Botón centrar / restablecer daño
-  document.querySelector("#btn-limpiar-danio")?.addEventListener("click", () => {
-    if (estadoApp.parcelaActual) {
+  // 1. Clic interactivo en el lienzo del croquis SVG para insertar nuevo foco
+  const croquisSvg = document.querySelector("#croquis-svg");
+  croquisSvg?.addEventListener("click", (e) => {
+    if (e.target.id === "croquis-parcela-rect" || e.target.id === "croquis-svg" || e.target.tagName === "svg" || e.target.tagName === "rect") {
       const p = estadoApp.parcelaActual;
-      puntoDanioActual = [Number(p.lat), Number(p.lon)];
-      puntosDanioPorParcela.set(p.id, puntoDanioActual);
-      pctDanioActual = 10;
-      pctDanioPorParcela.set(p.id, pctDanioActual);
-      actualizarMarcadorDanio(puntoDanioActual, pctDanioActual);
+      if (!p) return;
+      const rect = croquisSvg.getBoundingClientRect();
+      const scaleX = 600 / rect.width;
+      const scaleY = 380 / rect.height;
+      const clickX = Math.round((e.clientX - rect.left) * scaleX);
+      const clickY = Math.round((e.clientY - rect.top) * scaleY);
 
-      // Re-centrar vista del mapa en la parcela
-      const ladoMetros = Math.sqrt(Number(p.superficie_ha) * 10000);
-      const deltaLat = ladoMetros / 111320 / 2;
-      const deltaLon = ladoMetros / (111320 * Math.cos((Number(p.lat) * Math.PI) / 180)) / 2;
-      const bounds = [
-        [Number(p.lat) - deltaLat, Number(p.lon) - deltaLon],
-        [Number(p.lat) + deltaLat, Number(p.lon) + deltaLon],
-      ];
-      mapAgricultor.setMaxBounds(null);
-      mapAgricultor.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-      const maxBounds = L.latLngBounds(bounds).pad(1.2);
-      mapAgricultor.setMaxBounds(maxBounds);
+      // Clamping dentro del área visible de la parcela
+      const clampedX = Math.max(70, Math.min(530, clickX));
+      const clampedY = Math.max(60, Math.min(320, clickY));
 
-      mostrarToast("↺ Foco de daño centrado en la parcela (10%)");
+      const focos = obtenerFocosParcela(p.id);
+      const nuevoFoco = {
+        id: `foco-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        x: clampedX,
+        y: clampedY,
+        r: 32,
+      };
+      focos.push(nuevoFoco);
+      focoSeleccionadoId = nuevoFoco.id;
+      renderizarCroquisParcela(p);
+      mostrarToast(`📍 Foco de afección colocado en el croquis`);
     }
+  });
+
+  // Botones de acción del Croquis
+  document.querySelector("#btn-agregar-foco")?.addEventListener("click", agregarFocoCroquis);
+  document.querySelector("#btn-eliminar-foco")?.addEventListener("click", eliminarFocoCroquis);
+  document.querySelector("#btn-limpiar-focos")?.addEventListener("click", limpiarFocosCroquis);
+
+  // Slider de radio del foco activo
+  const sliderRadio = document.querySelector("#croquis-radio-slider");
+  sliderRadio?.addEventListener("input", (e) => {
+    const p = estadoApp.parcelaActual;
+    if (!p || !focoSeleccionadoId) return;
+    const focos = obtenerFocosParcela(p.id);
+    const fSel = focos.find((f) => f.id === focoSeleccionadoId);
+    if (fSel) {
+      fSel.r = Number(e.target.value) || 30;
+      renderizarCroquisParcela(p);
+    }
+  });
+
+  // Botones para adjuntar croquis al reporte (desde la barra del chat y desde el panel del croquis)
+  document.querySelector("#btn-adjuntar-croquis")?.addEventListener("click", adjuntarCroquisAlReporte);
+  document.querySelector("#btn-adjuntar-croquis-directo")?.addEventListener("click", adjuntarCroquisAlReporte);
+
+  // Botón para desvincular croquis del reporte
+  document.querySelector("#btn-remover-croquis")?.addEventListener("click", () => {
+    croquisAdjuntoActual = null;
+    document.querySelector("#adjunto-croquis-preview")?.classList.add("oculto");
+    if (!fotoAdjuntaActual && !audioAdjuntoActual) {
+      document.querySelector("#chat-adjuntos-bar")?.classList.add("oculto");
+    }
+    mostrarToast("Croquis desvinculado del reporte");
   });
 
   // 2. Adjuntar Fotografía
@@ -2336,7 +2546,7 @@ function inicializarEventosPortalAgricultor() {
   document.querySelector("#btn-remover-foto")?.addEventListener("click", () => {
     fotoAdjuntaActual = null;
     document.querySelector("#adjunto-foto-preview")?.classList.add("oculto");
-    if (!audioAdjuntoActual) {
+    if (!audioAdjuntoActual && !croquisAdjuntoActual) {
       document.querySelector("#chat-adjuntos-bar")?.classList.add("oculto");
     }
     if (fileInput) fileInput.value = "";
@@ -2479,7 +2689,7 @@ function inicializarEventosPortalAgricultor() {
     }
     audioAdjuntoActual = null;
     document.querySelector("#adjunto-audio-preview")?.classList.add("oculto");
-    if (!fotoAdjuntaActual) {
+    if (!fotoAdjuntaActual && !croquisAdjuntoActual) {
       document.querySelector("#chat-adjuntos-bar")?.classList.add("oculto");
     }
   });
@@ -2989,8 +3199,10 @@ let debouncedResizeTimer = null;
 window.addEventListener("resize", () => {
   clearTimeout(debouncedResizeTimer);
   debouncedResizeTimer = setTimeout(() => {
-    if (mapAgricultor) mapAgricultor.invalidateSize();
     if (mapTecnico) mapTecnico.invalidateSize();
+    if (estadoApp.parcelaActual && estadoApp.vistaActual === "agricultor") {
+      renderizarCroquisParcela(estadoApp.parcelaActual);
+    }
   }, 160);
 });
 

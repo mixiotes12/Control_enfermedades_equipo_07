@@ -1753,6 +1753,312 @@ tbody tr:hover {
   box-shadow: 0 5px 16px rgba(16, 185, 129, 0.55);
 }
 
+.chat-croquis-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(2, 132, 199, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #e0f2fe;
+}
+
+.chat-croquis-badge .croquis-badge-icon {
+  font-size: 20px;
+}
+
+/* Panel del Croquis Satelital de Parcela & Zonificación de Daño */
+.panel-croquis-box {
+  display: flex;
+  flex-direction: column;
+  height: 640px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--linea-fuerte);
+  background: rgba(11, 19, 34, 0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border-radius: 16px;
+}
+
+.croquis-header-agri {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid var(--linea);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.croquis-header-tit h3 {
+  margin: 0;
+  font-size: 15px;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.croquis-metrics-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #fca5a5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.croquis-metrics-pill strong {
+  color: #ffffff;
+  font-family: var(--mono);
+}
+
+.croquis-canvas-wrapper {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 330px;
+  background: radial-gradient(circle at center, #0a1826 0%, #060e18 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.croquis-parcela-badge {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  padding: 5px 12px;
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+}
+
+.croquis-badge-cultivo {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+#croquis-badge-id {
+  color: #ffffff;
+}
+
+#croquis-badge-dims {
+  color: var(--tenue);
+  font-size: 11px;
+}
+
+.croquis-orientacion-norte {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 10;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--linea);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.croquis-svg-lienzo {
+  width: 100%;
+  height: 100%;
+  max-height: 400px;
+  cursor: crosshair;
+}
+
+.croquis-canvas-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 11px;
+  color: var(--tenue);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.croquis-toolbar {
+  padding: 12px 18px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid var(--linea);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.croquis-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-croquis-act {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--linea);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-croquis-add {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #34d399;
+}
+.btn-croquis-add:hover {
+  background: rgba(16, 185, 129, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-croquis-del {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+.btn-croquis-del:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ffffff;
+}
+.btn-croquis-del:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-croquis-clear {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--tenue);
+}
+.btn-croquis-clear:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+.btn-croquis-attach-cta {
+  margin-left: auto;
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+.btn-croquis-attach-cta:hover {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.5);
+  transform: translateY(-1px);
+}
+
+.croquis-controls-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.croquis-slider-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slider-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.croquis-resumen-box {
+  background: rgba(10, 17, 30, 0.7);
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.croquis-stat-lbl {
+  font-size: 10.5px;
+  color: var(--tenue);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.croquis-stat-values {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: var(--mono);
+}
+
+.croquis-stat-values strong {
+  font-size: 14px;
+  color: #ef4444;
+}
+
+.stat-sep {
+  color: var(--tenue);
+}
+
+.stat-sup {
+  font-size: 11px;
+  color: var(--tenue);
+}
+
+/* Focos interactivos en SVG */
+.foco-circulo-svg {
+  cursor: move;
+  transition: stroke-width 0.15s ease;
+}
+.foco-circulo-svg:hover {
+  stroke-width: 3.5px;
+}
+.foco-circulo-svg.seleccionado {
+  stroke: #ffffff !important;
+  stroke-width: 3.5px;
+  filter: drop-shadow(0 0 8px #ef4444);
+}
+.foco-centro-dot {
+  cursor: move;
+}
+.foco-label-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  fill: #ffffff;
+  pointer-events: none;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+}
+
 /* Panel del Mapa Satelital Fitosanitario */
 .panel-mapa-box {
   display: flex;
@@ -1962,7 +2268,7 @@ tbody tr:hover {
   .agricultor-main-grid {
     grid-template-columns: 1fr;
   }
-  .panel-chat-box, .panel-mapa-box {
+  .panel-chat-box, .panel-mapa-box, .panel-croquis-box {
     height: 540px;
   }
 }
@@ -2741,7 +3047,7 @@ tbody tr:hover {
   .kpi-ribbon, .filtros-bar, .dos, .modal-grid-2, .tecnicos-scroll-grid {
     grid-template-columns: 1fr;
   }
-  .panel-chat-box, .panel-mapa-box {
+  .panel-chat-box, .panel-mapa-box, .panel-croquis-box {
     height: 500px;
   }
   .chat-msg {

@@ -187,31 +187,39 @@
         <button type="button" class="btn-close-modal" id="btn-cerrar-auth-agri">&times;</button>
       </div>
       <div class="modal-body auth-body">
-        <p class="auth-hint">Selecciona tu clave de productor o escribe tu nombre para cargar automáticamente tus parcelas:</p>
+        <p class="auth-hint">Selecciona tu clave de productor e ingresa tu PIN fitosanitario para autenticarte y cargar tus parcelas:</p>
         
-        <div class="form-grupo">
-          <label for="select-auth-productor">Clave o Nombre del Productor:</label>
-          <select id="select-auth-productor" class="input-grande">
-            <!-- Se puebla dinámicamente con los 191 productores -->
-          </select>
-        </div>
-
-        <div class="auth-demo-chips">
-          <span class="sub-hint">Productores destacados:</span>
-          <div class="chip-container">
-            <button type="button" class="chip-demo" data-pid="PR-101">PR-101 · Fidel Jiménez (P-001)</button>
-            <button type="button" class="chip-demo" data-pid="PR-105">PR-105 · Jacinto Vázquez (P-005, P-006)</button>
-            <button type="button" class="chip-demo" data-pid="PR-168">PR-168 · Andrés Corona (P-094 Brote)</button>
-            <button type="button" class="chip-demo" data-pid="PR-165">PR-165 · Gonzalo Morales (P-089)</button>
+        <form id="form-auth-agri" onsubmit="return false;">
+          <div class="form-grupo">
+            <label for="select-auth-productor">Clave o Nombre del Productor:</label>
+            <select id="select-auth-productor" class="input-grande">
+              <!-- Se puebla dinámicamente con los 191 productores -->
+            </select>
           </div>
-        </div>
 
-        <div class="auth-actions">
-          <button type="button" id="btn-confirmar-auth-agri" class="btn-primario btn-full">
-            <span>Acceder a Mis Parcelas</span>
-            <span>&rarr;</span>
-          </button>
-        </div>
+          <div class="form-grupo">
+            <label for="input-auth-pin-agri">PIN / Clave Fitosanitaria de Acceso:</label>
+            <input type="password" id="input-auth-pin-agri" class="input-grande" placeholder="Ingresa PIN (ej. 1234)" value="1234" autocomplete="current-password">
+            <span class="input-ayuda">PIN predeterminado para productores: <code>1234</code> o los 4 dígitos de tu clave (ej. <code>0101</code> para PR-101)</span>
+          </div>
+
+          <div class="auth-demo-chips">
+            <span class="sub-hint">Productores destacados:</span>
+            <div class="chip-container">
+              <button type="button" class="chip-demo" data-pid="PR-101">PR-101 · Fidel Jiménez (P-001)</button>
+              <button type="button" class="chip-demo" data-pid="PR-105">PR-105 · Jacinto Vázquez (P-005, P-006)</button>
+              <button type="button" class="chip-demo" data-pid="PR-168">PR-168 · Andrés Corona (P-094 Brote)</button>
+              <button type="button" class="chip-demo" data-pid="PR-165">PR-165 · Gonzalo Morales (P-089)</button>
+            </div>
+          </div>
+
+          <div class="auth-actions">
+            <button type="submit" id="btn-confirmar-auth-agri" class="btn-primario btn-full">
+              <span>Acceder a Mis Parcelas</span>
+              <span>&rarr;</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -458,67 +466,9 @@
   </main>
 
   <!-- ========================================================================
-       VISTA 2: PORTAL DEL AGRICULTOR (ASISTENTE CONVERSACIONAL & MAPA DE PARCELA)
+       VISTA 2: PORTAL DEL AGRICULTOR (ASISTENTE CONVERSACIONAL & CROQUIS DE PARCELA)
        ======================================================================== -->
   <section id="vista-agricultor" class="vista-contenedor oculto">
-    <!-- Banner de Identidad del Portal y Productor Autenticado -->
-    <div class="section-banner banner-agricultor">
-      <div class="banner-left">
-        <div class="banner-brand-row">
-          <div class="banner-logo-wrap">
-            <svg class="logo-fitosanitario logo-agri-banner" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Logotipo Oficial Sanidad Vegetal">
-              <defs>
-                <linearGradient id="logo-shield-grad-2" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#10b981" />
-                  <stop offset="50%" stop-color="#059669" />
-                  <stop offset="100%" stop-color="#0f766e" />
-                </linearGradient>
-                <linearGradient id="logo-radar-grad-2" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#38bdf8" />
-                  <stop offset="100%" stop-color="#0284c7" />
-                </linearGradient>
-                <linearGradient id="logo-leaf-grad-2" x1="12" y1="36" x2="32" y2="10" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#22c55e" />
-                  <stop offset="60%" stop-color="#4ade80" />
-                  <stop offset="100%" stop-color="#a3e635" />
-                </linearGradient>
-              </defs>
-              <path d="M22 3L6 9V20C6 29.5 12.8 38.3 22 41C31.2 38.3 38 29.5 38 20V9L22 3Z" fill="#0b1726" stroke="url(#logo-shield-grad-2)" stroke-width="2" stroke-linejoin="round"/>
-              <path d="M12 20C12 14.48 16.48 10 22 10" stroke="url(#logo-radar-grad-2)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.85"/>
-              <path d="M8 20C8 12.27 14.27 6 22 6" stroke="url(#logo-radar-grad-2)" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="3 4" opacity="0.6"/>
-              <path d="M22 34V15M22 15C18 19 15 25 18 29C20 31.6 22 34 22 34C22 34 24 31.6 26 29C29 25 26 19 22 15Z" fill="url(#logo-leaf-grad-2)" stroke="#15803d" stroke-width="1.2" stroke-linejoin="round"/>
-              <path d="M22 21L18.5 24M22 25L19 28M22 21L25.5 24M22 25L25 28" stroke="#ffffff" stroke-width="1" stroke-linecap="round" opacity="0.75"/>
-              <circle cx="22" cy="14" r="2.5" fill="#f59e0b"/>
-            </svg>
-          </div>
-          <div class="banner-headings">
-            <span class="banner-tag">SISTEMA FITOSANITARIO · ATENCIÓN DE CAMPO · DIMA CHAPINGO</span>
-            <h2>Portal del Agricultor</h2>
-            <p class="banner-desc">Canal directo para reportar anomalías en tus cultivos por texto libre, fotos y notas de voz con diagnóstico asistido por IA y respuesta técnica inmediata.</p>
-          </div>
-        </div>
-      </div>
-      <!-- Tarjeta fija de sesión de productor (con cambio explícito de cuenta sin selects ajenos) -->
-      <div class="productor-sesion-card" id="productor-sesion-card">
-        <div class="prod-avatar">👨‍🌾</div>
-        <div class="prod-info">
-          <span class="prod-badge-verified">✓ Productor en Sesión Activa</span>
-          <strong id="agr-productor-nombre">—</strong>
-          <span class="prod-sub" id="agr-productor-id">Sin sesión activa</span>
-        </div>
-        <div class="prod-card-actions">
-          <button type="button" id="btn-cambiar-productor" class="btn-cambiar-productor" title="Cambiar a otra cuenta de productor">
-            <span>🔄</span>
-            <span>Cambiar Productor</span>
-          </button>
-          <button type="button" id="btn-cerrar-sesion-agri" class="btn-salir-agricultor" title="Cerrar sesión de productor">
-            <span>🚪</span>
-            <span>Cerrar Sesión</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- Barra de Selección de Parcelas Propias (Aislamiento Total del Productor) -->
     <div class="agr-parcelas-bar" id="agr-parcelas-bar">
       <div class="agr-parcelas-label">
@@ -534,7 +484,7 @@
       <!-- Se actualiza dinámicamente según la parcela seleccionada -->
     </div>
 
-    <!-- Cuadrícula Principal: Chat Multimodal + Mapa Satelital Centrado -->
+    <!-- Cuadrícula Principal: Chat Multimodal + Croquis Satelital de la Parcela -->
     <div class="agricultor-main-grid">
       <!-- Columna 1: Chat de Asistencia Multimodal -->
       <div class="tarjeta panel-chat-box">
@@ -567,7 +517,7 @@
           </div>
         </div>
 
-        <!-- Barra de Previsualización de Adjuntos (Foto o Audio) -->
+        <!-- Barra de Previsualización de Adjuntos (Foto, Audio, Croquis) -->
         <div id="chat-adjuntos-bar" class="chat-adjuntos-bar oculto">
           <div id="adjunto-foto-preview" class="adjunto-chip oculto">
             <img id="adjunto-foto-img" src="" alt="Foto adjunta" class="adjunto-thumb" />
@@ -587,6 +537,15 @@
             <audio id="adjunto-audio-player" controls class="adjunto-audio-mini"></audio>
             <button type="button" id="btn-remover-audio" class="btn-adjunto-del" title="Quitar audio">✕</button>
           </div>
+
+          <div id="adjunto-croquis-preview" class="adjunto-chip oculto">
+            <span class="adjunto-chip-icon">📐</span>
+            <div class="adjunto-chip-info">
+              <span class="adjunto-chip-title">Croquis de Daño Adjunto</span>
+              <span id="adjunto-croquis-desc" class="adjunto-chip-sub">1 foco · 0.55 ha (10.0%)</span>
+            </div>
+            <button type="button" id="btn-remover-croquis" class="btn-adjunto-del" title="Quitar croquis del reporte">✕</button>
+          </div>
         </div>
 
         <!-- Banner de Grabación Activa de Audio -->
@@ -602,7 +561,7 @@
           </div>
         </div>
 
-        <!-- Barra de Entrada Multimodal (Texto, Cámara, Micrófono) -->
+        <!-- Barra de Entrada Multimodal (Texto, Cámara, Micrófono, Croquis) -->
         <form id="chat-form" class="chat-input-bar">
           <input type="file" id="chat-file-input" accept="image/*" class="oculto" capture="environment">
           <button type="button" id="btn-adjuntar-foto" class="btn-chat-attach" title="Adjuntar foto de la hoja o plaga">
@@ -610,6 +569,9 @@
           </button>
           <button type="button" id="btn-grabar-audio" class="btn-chat-attach" title="Grabar nota de voz">
             <span>🎙️</span>
+          </button>
+          <button type="button" id="btn-adjuntar-croquis" class="btn-chat-attach" title="Adjuntar croquis y cálculo de áreas afectadas al reporte">
+            <span>📐</span>
           </button>
           <div class="chat-input-wrap">
             <textarea id="chat-input-texto" rows="1" placeholder="Describe lo que notas (ej. hojas comidas, gusanos en cogollo)..."></textarea>
@@ -620,36 +582,108 @@
         </form>
       </div>
 
-      <!-- Columna 2: Mapa Satelital Fitosanitario Centrado en la Parcela -->
-      <div class="tarjeta panel-mapa-box">
-        <div class="mapa-header-agri">
-          <div class="mapa-header-tit">
-            <h3>🛰️ Mapa Satelital de Mi Parcela</h3>
-            <p id="mapa-sub-hint" class="sub-hint">Toca o haz clic en la parcela para marcar el foco del daño.</p>
+      <!-- Columna 2: Croquis Satelital de la Parcela & Zonificación de Daño -->
+      <div class="tarjeta panel-croquis-box">
+        <div class="croquis-header-agri">
+          <div class="croquis-header-tit">
+            <h3>📐 Croquis Fitosanitario de la Parcela</h3>
+            <p id="croquis-sub-hint" class="sub-hint">Impresión satelital del cultivo. Haz clic en la parcela para insertar focos de daño.</p>
           </div>
-          <div class="mapa-metrics-pill" id="mapa-metrics-pill">
+          <div class="croquis-metrics-pill" id="croquis-metrics-pill">
             <span class="dot-danio"></span>
-            <span id="mapa-metrics-txt">Área afectada: <strong>10%</strong> (~0.55 ha)</span>
+            <span id="croquis-metrics-txt">Focos: <strong>1</strong> · Daño: <strong>10.0%</strong> (~0.55 ha)</span>
           </div>
         </div>
 
-        <!-- Contenedor del Mapa Leaflet -->
-        <div id="mapa" class="mapa-satelital-lienzo"></div>
-
-        <!-- Barra de Controles Táctiles de Marcado de Daño -->
-        <div class="mapa-danio-toolbar">
-          <div class="danio-quick-pills">
-            <span class="danio-lbl">Dimensión del daño:</span>
-            <button type="button" class="btn-danio-chip active" data-pct="10">Foco leve (10%)</button>
-            <button type="button" class="btn-danio-chip" data-pct="25">Cuarta parte (25%)</button>
-            <button type="button" class="btn-danio-chip" data-pct="50">Mitad (50%)</button>
-            <button type="button" class="btn-danio-chip" data-pct="100">Toda la parcela (100%)</button>
-            <button type="button" id="btn-limpiar-danio" class="btn-danio-clear" title="Restablecer marcado">↺ Centrar</button>
+        <!-- Contenedor del Lienzo Interactivo del Croquis (Solo la Parcela) -->
+        <div class="croquis-canvas-wrapper" id="croquis-canvas-wrapper">
+          <div class="croquis-parcela-badge" id="croquis-parcela-badge">
+            <span class="croquis-badge-cultivo" id="croquis-badge-cultivo">🌱 Maíz</span>
+            <strong id="croquis-badge-id">Parcela P-001 · San Miguel</strong>
+            <span id="croquis-badge-dims">5.50 ha · ~235 m × 234 m</span>
           </div>
-          <div class="danio-slider-row">
-            <span class="slider-lbl">Ajuste fino (%):</span>
-            <input type="range" id="mapa-slider-pct" min="1" max="100" value="10" class="range-pct-agri">
-            <span id="mapa-slider-val" class="slider-val-badge">10%</span>
+          
+          <div class="croquis-orientacion-norte">
+            <span>⬆️ N</span>
+          </div>
+
+          <!-- Lienzo Interactivo SVG donde se dibuja solo la parcela y los círculos de daño -->
+          <svg id="croquis-svg" class="croquis-svg-lienzo" viewBox="0 0 600 380" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <pattern id="crop-pattern" width="28" height="28" patternUnits="userSpaceOnUse">
+                <rect width="28" height="28" fill="#0b2416"/>
+                <line x1="0" y1="7" x2="28" y2="7" stroke="#12472b" stroke-width="2"/>
+                <line x1="0" y1="21" x2="28" y2="21" stroke="#12472b" stroke-width="2"/>
+                <circle cx="14" cy="14" r="2.5" fill="#10b981" opacity="0.6"/>
+              </pattern>
+            </defs>
+
+            <!-- Fondo de la parcela (límite exacto de cultivo) -->
+            <rect id="croquis-parcela-rect" x="30" y="25" width="540" height="330" rx="14" fill="url(#crop-pattern)" stroke="#10b981" stroke-width="3"/>
+            
+            <!-- Cuadrícula y surcos internos -->
+            <g id="croquis-surcos-grid">
+              <line x1="30" y1="108" x2="570" y2="108" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
+              <line x1="30" y1="190" x2="570" y2="190" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
+              <line x1="30" y1="272" x2="570" y2="272" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
+              <line x1="165" y1="25" x2="165" y2="355" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
+              <line x1="300" y1="25" x2="300" y2="355" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
+              <line x1="435" y1="25" x2="435" y2="355" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3 3"/>
+            </g>
+
+            <!-- Grupo dinámico de círculos / focos de daño -->
+            <g id="croquis-focos-group"></g>
+
+            <!-- Escala métrica visual -->
+            <g id="croquis-escala" transform="translate(440, 325)">
+              <rect x="0" y="0" width="115" height="18" fill="rgba(10,17,30,0.85)" rx="4" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+              <line x1="12" y1="9" x2="102" y2="9" stroke="#ffffff" stroke-width="2"/>
+              <line x1="12" y1="4" x2="12" y2="14" stroke="#ffffff" stroke-width="2"/>
+              <line x1="102" y1="4" x2="102" y2="14" stroke="#ffffff" stroke-width="2"/>
+              <text x="57" y="12" fill="#ffffff" font-size="9" text-anchor="middle" font-family="monospace">50 metros</text>
+            </g>
+          </svg>
+
+          <div class="croquis-canvas-hint">
+            <span>🖱️ Clic en el croquis para agregar foco · Arrastra para mover · Ajusta radio abajo</span>
+          </div>
+        </div>
+
+        <!-- Barra de Controles del Croquis -->
+        <div class="croquis-toolbar">
+          <div class="croquis-actions-row">
+            <button type="button" id="btn-agregar-foco" class="btn-croquis-act btn-croquis-add">
+              <span>➕ Agregar Foco</span>
+            </button>
+            <button type="button" id="btn-eliminar-foco" class="btn-croquis-act btn-croquis-del" disabled>
+              <span>🗑️ Quitar Foco</span>
+            </button>
+            <button type="button" id="btn-limpiar-focos" class="btn-croquis-act btn-croquis-clear">
+              <span>↺ Limpiar Focos</span>
+            </button>
+            <button type="button" id="btn-adjuntar-croquis-directo" class="btn-croquis-act btn-croquis-attach-cta">
+              <span>📋 Adjuntar al Chat</span>
+            </button>
+          </div>
+
+          <div class="croquis-controls-grid">
+            <div class="croquis-slider-box">
+              <div class="slider-header-flex">
+                <span class="slider-lbl">Radio del foco seleccionado:</span>
+                <span id="croquis-radio-val" class="slider-val-badge">~25 m</span>
+              </div>
+              <input type="range" id="croquis-radio-slider" min="15" max="85" value="35" class="range-pct-agri">
+            </div>
+
+            <div class="croquis-resumen-box">
+              <span class="croquis-stat-lbl">Área Dañada Calculada:</span>
+              <div class="croquis-stat-values">
+                <strong id="croquis-calc-ha">0.55 ha</strong>
+                <span class="stat-sep">·</span>
+                <strong id="croquis-calc-pct">10.0%</strong>
+                <span class="stat-sup" id="croquis-calc-total">de 5.50 ha</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
