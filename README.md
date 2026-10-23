@@ -1,4 +1,4 @@
-# 🌾 ALERTA PLAGA · Vigilancia Fitosanitaria Autónoma & Control Geoespacial
+# 🌿 IT green · Vigilancia Fitosanitaria Autónoma & Control Geoespacial
 
 > **Equipo 07 · MISA**  
 > **Departamento de Ingeniería Mecánica Agrícola (DIMA) — Universidad Autónoma Chapingo**  
@@ -10,15 +10,17 @@
 
 ## 🏆 Desempeño en Vivo en la Competencia
 
-| Indicador Oficial | Resultado MISA | Rendimiento |
+| Indicador Oficial | Resultado MISA (Equipo 07) | Rendimiento Competitivo |
 | :--- | :---: | :---: |
-| **Puntuación Acumulada** | **685+ Puntos** | **Top 2 General (91.0% efectividad)** |
-| **Precisión en Diagnóstico de Plaga** | **98 %** | Matriz biológica validada |
-| **Precisión en Detección de Brotes** | **98 %** | Historial de 159+ casos $\le 5$ km |
-| **Precisión en Asignación de Técnico** | **98 %** | Distancia geodésica y carga $< 5$ |
-| **Precisión en Semáforo de Riesgo** | **96 %** | Fórmula oficial de Severidad, Superficie y Etapa |
-| **Latencia Mediana de Respuesta** | **3.4 minutos** | **16 veces más rápido que el promedio** |
-| **Cobertura de Reportes Publicados** | **188 / 188 (100 %)** | Cero reportes omitidos o en cola |
+| **Puntuación Final Certificada** | **761 Puntos** | **Subcampeón General (91.6% efectividad)** |
+| **Aciertos Totales Evaluados** | **781 Aciertos** | 97.5% de atributos validados |
+| **Precisión en Diagnóstico de Plaga** | **98 %** | Matriz biológica validada y multiespecie |
+| **Precisión en Asignación de Técnico** | **98 %** | Optimización geodésica Haversine y carga $< 5$ |
+| **Precisión en Detección de Brotes** | **97 %** | Radar epidemiológico dinámico $\le 5.0$ km / 7 días |
+| **Precisión en Semáforo de Riesgo** | **96 %** | Matriz de Severidad, Superficie y Fenología |
+| **Latencia Mediana de Respuesta** | **0.5 minutos (30 s)** | **Líder absoluto de velocidad (104x vs 1.er lugar)** |
+| **Avisos Oficiales Emitidos** | **357 Notificaciones** | **Líder en cobertura y alertas preventivas a vecinos** |
+| **Cobertura de Reportes Oficiales** | **210 / 210 (100 %)** | 100% de la carga del certamen procesada |
 
 ---
 

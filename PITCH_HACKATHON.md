@@ -27,7 +27,7 @@
 *(Mostrar la pantalla de `https://equipo07.179-236-73-82.sslip.io`)*
 
 > *"Vean esto en vivo en nuestro servidor de producción:*
-> * En el **Centro de Mando**, observamos el mapa de Texcoco con 188 reportes atendidos. Los círculos rojos pulsantes señalan los focos de brote activo, y las trazas conectan a cada técnico disponible con su parcela asignada.
+> * En el **Centro de Mando**, observamos el mapa regional de Texcoco con los 210 reportes atendidos al 100% de cobertura. Los círculos rojos pulsantes señalan los focos de brote activo, y las trazas conectan a cada técnico disponible con su parcela asignada.
 > * En el **Expediente del Caso**, cualquier supervisor puede escuchar el audio original del productor, ver la foto y auditar el desglose matemático exacto de cómo se calculó la prioridad.
 > * Y en el **Portal del Agricultor**, don Fidel Jiménez puede consultar su parcela y ver en su **Radar Fitosanitario** que a menos de 3 kilómetros se detectó un brote de gusano cogollero, permitiéndole aplicar medidas preventivas de inmediato."*
 

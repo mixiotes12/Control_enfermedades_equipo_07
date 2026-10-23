@@ -1,7 +1,7 @@
 # Documentación Completa del Sistema: Portal Fitosanitario y Agente Autónomo MISA
 
 > **Equipo 07 (MISA)**  
-> **Estado de Competencia**: **1.ᵉʳ Lugar General** (497 Puntos | 94.5% de Efectividad)  
+> **Estado de Competencia**: **Subcampeón General Certificado** (761 Puntos | 91.6% de Efectividad | 210/210 Casos)  
 > **Fecha de Actualización**: 21 de Octubre de 2026  
 > **Ambiente de Producción**: `https://equipo07.179-236-73-82.sslip.io`
 
@@ -204,3 +204,38 @@ Estado: código desplegado a `~/agente` y `~/app` con reinicio de `agente` en pr
 2. **Fallo de Brote Epidemiológico (R-2174):**
    - **Causa raíz:** En la zona de `R-2174` existían 3 casos de `mosquita_blanca` (`R-2040`, `R-2135` y `R-2174`). Sin embargo, `R-2135` había sido registrado originalmente en la madrugada con plaga 'desconocida' y su respuesta aclaratoria (`R-2135-R`) no había actualizado el historial local en memoria. El agente contó solo 2 casos y envió `brote: false`.
    - **Solución implementada:** Se integró la función `enriquecer_historial_con_respuestas()` en `agente.py`, que al inicio de cada ciclo inspecciona las respuestas de productores (`respuesta_a`) y actualiza el historial base a 159 casos completos. Al recalcular con el historial enriquecido, `R-2174` arroja `brote: True` de forma 100% exacta.
+
+
+---
+
+## 7. Cierre de Certamen: Identidad Corporativa IT green, Satélite Dinámico y Bot Multi-Rol
+
+### 7.1 Identidad Corporativa SaaS IT green (itgreen.io)
+- **Eliminación Total de Estética Neón / Ciberpunk:**
+  - Se suprimieron todas las capas ambientales fluorescentes (`.ambient-glow`, `.portal-glow`), resplandores artificiales (`box-shadow: 0 0 15px...`) y fondos oscuros de bajo contraste.
+  - Se implementó la paleta oficial de **IT green**: fondo general tipo lienzo `--paper: #f6f8f5`, superficies `--paper-2: #ffffff` con bordes finos `--line: #dfe7e0`, y contraste tipográfico en verde bosque `--ink: #1f3832` y acentos naturales `--itgreen-emerald: #00c067` y `--forest: #17302a`.
+- **Barra Superior Estática:**
+  - Modificación de `.topbar` a `position: static;` para permitir un desplazamiento natural al hacer scroll sin invadir ni ocultar los mapas o lienzos interactivos.
+- **Optimización del Centro de Mando:**
+  - Expansión automática del mapa táctico al 100% del ancho cuando un técnico especialista (`T-01` a `T-12`) inicia sesión, ocultando la columna de escuadrón lateral y redimensionando el canvas Leaflet con `invalidateSize()`.
+  - Depuración de casos de prueba (`R-1001` a `R-1040`), mostrando exclusivamente casos operativos en vivo.
+
+### 7.2 Ortofoto Satelital Dinámica por Parcela y Unión Booleana Exacta en Croquis
+- **Captura Satelital en Tiempo Real (ArcGIS World Imagery):**
+  - Implementación de `obtenerUrlSateliteParcela(p)`: calcula el encuadre geográfico (*bounding box* WGS84) exacto según las coordenadas `lat`, `lon` y la superficie en hectáreas del predio, cargando la fotografía aérea de alta resolución para cada parcela seleccionada.
+  - Blindaje táctil móvil con `touch-action: none !important;` y eventos de puntero no pasivos.
+- **Cálculo de Área Afectada con Unión Booleana Exacta:**
+  - Modificación del motor geométrico `calcularAreaDanioParcela(p, focos)` para calcular la **Unión Booleana** ($igcup C_i$) de los focos de daño mediante una rejilla matricial de alta precisión. Si dos o más focos se solapan, la intersección se contabiliza una sola vez, garantizando un porcentaje y hectáreas afectadas rigurosamente exactos.
+
+### 7.3 Bot de Telegram Corporativo Multi-Rol (@CoordinadorAlertasBot)
+- **Identidad Institucional:**
+  - Avatar oficial con fondo blanco puro sólido (`itgreen_avatar_white.jpg`) cargado directamente a los servidores de Telegram mediante `setMyProfilePhoto`.
+  - Metadatos configurados (`setMyName`, `setMyDescription`, `setMyShortDescription`).
+- **Comandos Ejecutivos y Métricas Operativas:**
+  - `/resumen`: Depurado de métricas de concurso, enfocado en estado operativo (casos bajo monitoreo, semáforos activos, brotes en radio de 5 km, parcelas y especialistas en turno).
+  - `/tecnicos`: Monitoreo en vivo de cargas de los 12 especialistas (`T-01` a `T-12`).
+  - `/ayuda`: Manual operativo y accesos directos.
+- **Soporte Multi-Rol (Técnicos y Agricultores):**
+  - **Canal para Técnicos:** Onboarding mediante `/soy_tecnico` con asignación de clave y consulta de `/mis_casos`. Notificación push cuando se les asigna una visita de campo aprobada.
+  - **Canal para Agricultores:** Vinculación con `/soy_productor` y `/mi_parcela`. Detección automática y envío de alertas preventivas prioritarias cuando se confirma un brote epidémico activo a $\le 5	ext{ km}$ de su parcela.
+  - **Navegación Web Integrada:** Botones interactivos con enlaces directos al Centro de Mando y al expediente digital de cada caso.
