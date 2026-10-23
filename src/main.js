@@ -1276,10 +1276,43 @@ function renderizarTablaCasosNivel2(casosFiltrados) {
 }
 
 function actualizarVistaTecnico() {
+  const sesion = cargarSesion();
+  const esTecnicoIndiv =
+    (sesion && sesion.rol === "tecnico") ||
+    (estadoApp.filtroTecnico && estadoApp.filtroTecnico !== "todos");
+
+  const cardEscuadron = document.querySelector(".card-escuadron-tecnico");
+  const topGrid = document.querySelector(".tecnico-top-grid");
+
+  if (cardEscuadron) {
+    if (esTecnicoIndiv) {
+      cardEscuadron.classList.add("oculto");
+      cardEscuadron.style.display = "none";
+    } else {
+      cardEscuadron.classList.remove("oculto");
+      cardEscuadron.style.display = "";
+    }
+  }
+  if (topGrid) {
+    if (esTecnicoIndiv) {
+      topGrid.classList.add("tecnico-top-grid-solo");
+    } else {
+      topGrid.classList.remove("tecnico-top-grid-solo");
+    }
+  }
+
   const filtrados = filtrarCasosTecnico();
-  renderizarEscuadronTecnicos();
+  if (!esTecnicoIndiv) {
+    renderizarEscuadronTecnicos();
+  }
   renderizarMapaTecnico(filtrados);
   renderizarTablaCasosNivel2(filtrados);
+
+  if (mapTecnico) {
+    setTimeout(() => {
+      mapTecnico.invalidateSize();
+    }, 60);
+  }
 }
 
 // ============================================================================
@@ -1721,6 +1754,29 @@ function actualizarMetricasCroquis() {
   }
 }
 
+
+function obtenerUrlSateliteParcela(p) {
+  if (!p || p.lat === undefined || p.lon === undefined) {
+    return "/croquis-satelite-ortofoto.jpg";
+  }
+  const lat = Number(p.lat);
+  const lon = Number(p.lon);
+  if (isNaN(lat) || isNaN(lon)) {
+    return "/croquis-satelite-ortofoto.jpg";
+  }
+  const ha = Math.max(0.5, Number(p.superficie_ha) || 2.0);
+  const ladoMetros = Math.max(220, Math.sqrt(ha * 10000) * 1.35);
+  const deltaLat = (ladoMetros / 111320) / 2;
+  const deltaLon = (ladoMetros / (111320 * Math.cos((lat * Math.PI) / 180))) / 2;
+
+  const minLon = (lon - deltaLon).toFixed(6);
+  const minLat = (lat - deltaLat).toFixed(6);
+  const maxLon = (lon + deltaLon).toFixed(6);
+  const maxLat = (lat + deltaLat).toFixed(6);
+
+  return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${minLon},${minLat},${maxLon},${maxLat}&bboxSR=4326&imageSR=4326&size=600,380&format=jpg&f=image`;
+}
+
 function renderizarCroquisParcela(p) {
   if (!p) return;
   const svgGroup = document.querySelector("#croquis-focos-group");
@@ -1736,6 +1792,21 @@ function renderizarCroquisParcela(p) {
   if (badgeId) badgeId.textContent = `Parcela ${p.id} · ${p.nombre}`;
   if (badgeCultivo) badgeCultivo.textContent = `🌱 ${p.cultivo || "Cultivo"}`;
   if (badgeDims) badgeDims.textContent = `${supHa.toFixed(2)} ha · ~${ladoMetros} m × ${ladoMetros} m`;
+
+  // Actualizar imagen satelital fotorrealista específica a las coordenadas exactas de la parcela
+  const imgSatelite = document.querySelector("#croquis-satelite-img");
+  if (imgSatelite) {
+    const urlSatelite = obtenerUrlSateliteParcela(p);
+    imgSatelite.setAttribute("href", urlSatelite);
+    imgSatelite.setAttributeNS("http://www.w3.org/1999/xlink", "href", urlSatelite);
+  }
+
+  // Actualizar escala métrica según la dimensión real del predio
+  const metrosEscala = Math.max(15, Math.round((90 / 540) * Math.max(180, ladoMetros)));
+  const escalaText = document.querySelector("#croquis-escala text");
+  if (escalaText) {
+    escalaText.textContent = `${metrosEscala} metros`;
+  }
 
   const focos = obtenerFocosParcela(p.id);
 

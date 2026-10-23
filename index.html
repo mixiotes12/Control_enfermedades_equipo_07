@@ -11,9 +11,6 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 </head>
 <body>
-  <!-- Fondo ambiental decorativo -->
-  <div class="ambient-glow glow-1" aria-hidden="true"></div>
-  <div class="ambient-glow glow-2" aria-hidden="true"></div>
 
   <!-- Notificación Toast Flotante -->
   <div id="toast-container" class="toast-container" aria-live="polite"></div>
@@ -84,7 +81,7 @@
             <img src="/itgreen.png" alt="IT green" class="logo-itgreen-hero" />
           </div>
         </div>
-        <span class="badge-corporate pulse-glow">Plataforma Empresarial de Bioseguridad y Sanidad Vegetal</span>
+        <span class="badge-corporate">Plataforma Empresarial de Bioseguridad y Sanidad Vegetal</span>
         <h1 class="landing-title">Sistema Corporativo de Vigilancia Fitosanitaria <span class="gradient-text">IT green</span></h1>
         <p class="landing-sub">
           Detección asistida por inteligencia artificial, monitoreo epidemiológico de precisión y coordinación técnica de campo para la protección integral de cultivos.
@@ -95,7 +92,6 @@
       <div class="landing-cards-grid">
         <!-- Tarjeta 1: Portal del Agricultor -->
         <div class="portal-card portal-card-agricultor" id="card-acceso-agricultor">
-          <div class="portal-glow" aria-hidden="true"></div>
           <div class="portal-badge">Módulo de Campo · Productores</div>
           <div class="portal-icon">👨‍🌾</div>
           <h2 class="portal-title">Portal del Agricultor</h2>
@@ -116,7 +112,6 @@
 
         <!-- Tarjeta 2: Centro de Mando Técnico & Coordinación -->
         <div class="portal-card portal-card-coordinador" id="card-acceso-coordinador">
-          <div class="portal-glow" aria-hidden="true"></div>
           <div class="portal-badge badge-admin">Centro de Mando · Autoridades</div>
           <div class="portal-icon">🔬</div>
           <h2 class="portal-title">Centro de Mando Técnico</h2>
@@ -747,7 +742,7 @@
             <label for="bit-observaciones">Observaciones de Campo</label>
             <textarea id="bit-observaciones" name="observaciones" rows="3" placeholder="Describe los hallazgos, dosis o recomendaciones del técnico..."></textarea>
           </div>
-          <button type="submit" class="btn-submit-glow">💾 Guardar en Bitácora (Supabase & Servidor)</button>
+          <button type="submit" class="btn-portal">💾 Guardar en Bitácora (Supabase & Servidor)</button>
           <p id="bit-estado" class="estado"></p>
         </form>
 
