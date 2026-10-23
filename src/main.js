@@ -1693,17 +1693,48 @@ function obtenerFocosParcela(parcelaId) {
 
 function calcularAreaDanioParcela(p, focos) {
   const supTotalHa = Number(p?.superficie_ha) || 1.0;
-  // Rectángulo de cultivo en SVG: 540 x 330 px = 178,200 px²
-  const areaLienzoPx = 540 * 330;
-  let areaTotalFocosPx = 0;
+  if (!focos || focos.length === 0) {
+    return {
+      supTotalHa,
+      haDanadas: 0,
+      pctDanio: 0,
+    };
+  }
 
-  focos.forEach((f) => {
-    areaTotalFocosPx += Math.PI * Math.pow(f.r, 2);
-  });
+  // Rectángulo de cultivo en SVG: 540 x 330 px (origen x=30, y=25)
+  // Cálculo de la UNIÓN booleana exacta de círculos para no duplicar áreas solapadas
+  const W = 540;
+  const H = 330;
+  const minX = 30;
+  const minY = 25;
+  const step = 3; // Rejilla de alta precisión (180 x 110 = 19,800 celdas)
+  let puntosAdentro = 0;
+  let puntosTotales = 0;
 
-  const fraccion = Math.min(1.0, areaTotalFocosPx / areaLienzoPx);
-  const haDanadas = Math.min(supTotalHa, supTotalHa * fraccion);
-  const pctDanio = focos.length === 0 ? 0 : Math.min(100, Math.max(1, Math.round(fraccion * 100)));
+  // Pre-calcular radios al cuadrado
+  const focosR2 = focos.map((f) => ({
+    x: f.x,
+    y: f.y,
+    r2: f.r * f.r,
+  }));
+
+  for (let y = minY; y < minY + H; y += step) {
+    for (let x = minX; x < minX + W; x += step) {
+      puntosTotales++;
+      for (let i = 0; i < focosR2.length; i++) {
+        const dx = x - focosR2[i].x;
+        const dy = y - focosR2[i].y;
+        if (dx * dx + dy * dy <= focosR2[i].r2) {
+          puntosAdentro++;
+          break; // Unión exacta: si cae en cualquier círculo, cuenta una sola vez
+        }
+      }
+    }
+  }
+
+  const fraccionUnion = puntosTotales > 0 ? Math.min(1.0, puntosAdentro / puntosTotales) : 0;
+  const haDanadas = Math.min(supTotalHa, supTotalHa * fraccionUnion);
+  const pctDanio = Math.min(100, Math.max(1, Math.round(fraccionUnion * 100)));
 
   return {
     supTotalHa,

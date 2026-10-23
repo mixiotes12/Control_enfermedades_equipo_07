@@ -118,12 +118,9 @@ body {
 
 /* Topbar Principal */
 .topbar {
-  position: sticky;
-  top: 0;
+  position: static;
   z-index: 1100;
-  background: rgba(246, 248, 245, 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(246, 248, 245, 0.98);
   border-bottom: 1px solid var(--line);
   padding: 12px 24px;
 }
