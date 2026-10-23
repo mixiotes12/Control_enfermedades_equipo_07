@@ -1283,6 +1283,7 @@ function actualizarVistaTecnico() {
 
   const cardEscuadron = document.querySelector(".card-escuadron-tecnico");
   const topGrid = document.querySelector(".tecnico-top-grid");
+  const btnResetMap = document.querySelector("#btn-restablecer-vista-completa");
 
   if (cardEscuadron) {
     if (esTecnicoIndiv) {
@@ -1298,6 +1299,18 @@ function actualizarVistaTecnico() {
       topGrid.classList.add("tecnico-top-grid-solo");
     } else {
       topGrid.classList.remove("tecnico-top-grid-solo");
+    }
+  }
+
+  // El botón para restablecer vista completa en el mapa se muestra cuando hay un filtro activo y no es sesión fija de técnico
+  if (btnResetMap) {
+    if (sesion && sesion.rol === "tecnico") {
+      btnResetMap.classList.add("oculto");
+      btnResetMap.style.display = "none";
+    } else {
+      const filtroActivo = estadoApp.filtroTecnico && estadoApp.filtroTecnico !== "todos";
+      btnResetMap.classList.toggle("oculto", !filtroActivo);
+      btnResetMap.style.display = filtroActivo ? "" : "none";
     }
   }
 
@@ -3299,6 +3312,22 @@ document.querySelector("#btn-limpiar-tecnico")?.addEventListener("click", () => 
   const sel = document.querySelector("#filtro-tecnico-select");
   if (sel) sel.value = "todos";
   actualizarVistaTecnico();
+  mostrarToast("🗺️ Vista regional restablecida: Mostrando todos los técnicos y parcelas");
+});
+
+document.querySelector("#btn-restablecer-vista-completa")?.addEventListener("click", () => {
+  const sesion = cargarSesion();
+  if (sesion && sesion.rol === "tecnico") {
+    return;
+  }
+  estadoApp.filtroTecnico = "todos";
+  const sel = document.querySelector("#filtro-tecnico-select");
+  if (sel) sel.value = "todos";
+  actualizarVistaTecnico();
+  if (mapTecnico) {
+    mapTecnico.flyTo([19.515, -98.875], 11, { duration: 0.7 });
+  }
+  mostrarToast("🗺️ Vista regional restablecida: Mostrando todos los 12 técnicos y 264 parcelas");
 });
 
 // Botones de capas en el Mapa Táctico

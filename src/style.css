@@ -583,6 +583,21 @@ h3 { margin: 0 0 4px 0; font-size: 16px; font-weight: 700; color: var(--ink); }
   box-shadow: 0 2px 6px rgba(23, 48, 42, 0.15);
 }
 
+.chip-toggle-reset {
+  background: #0284c7;
+  border-color: #0369a1;
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+  animation: pulseLight 2s infinite ease-in-out;
+}
+
+.chip-toggle-reset:hover {
+  background: #0369a1;
+  border-color: #075985;
+  color: #ffffff;
+}
+
 .mapa-lienzo {
   height: 460px;
   width: 100%;
@@ -1164,26 +1179,26 @@ tbody tr:hover {
   gap: 16px;
   padding: 16px 20px;
   border-radius: 14px;
-  border: 1px solid var(--linea);
+  border: 1px solid var(--line);
   transition: all 0.3s ease;
   backdrop-filter: blur(8px);
 }
 
 .visita-card.visita-limpia {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(6, 78, 59, 0.2));
-  border-color: rgba(16, 185, 129, 0.3);
+  background: #f0fdf4;
+  border-color: #86efac;
 }
 
 .visita-card.visita-activa {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(154, 52, 18, 0.25));
-  border-color: rgba(249, 115, 22, 0.45);
-  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.15);
+  background: #fff7ed;
+  border-color: #fed7aa;
+  box-shadow: 0 4px 16px rgba(234, 88, 12, 0.08);
 }
 
 .visita-card.visita-aviso-critico {
-  background: linear-gradient(135deg, rgba(127, 29, 29, 0.5), rgba(69, 10, 10, 0.7));
+  background: #fef2f2;
   border: 2px solid #ef4444;
-  box-shadow: 0 4px 20px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.12);
 }
 
 .visita-icon {
@@ -1214,10 +1229,10 @@ tbody tr:hover {
   letter-spacing: 0.05em;
   padding: 4px 11px;
   border-radius: 999px;
-  background: #7f1d1d;
+  background: #dc2626;
   color: #ffffff;
-  border: 1.5px solid #ef4444;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
+  border: 1px solid #b91c1c;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
   text-transform: uppercase;
 }
 
@@ -1230,10 +1245,10 @@ tbody tr:hover {
   letter-spacing: 0.06em;
   padding: 4px 12px;
   border-radius: 999px;
-  background: #7f1d1d;
+  background: #dc2626;
   color: #ffffff;
-  border: 1.5px solid #ef4444;
-  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+  border: 1px solid #b91c1c;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
   text-transform: uppercase;
 }
 
@@ -1241,29 +1256,38 @@ tbody tr:hover {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.05em;
-  padding: 3px 9px;
+  padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(16, 185, 129, 0.2);
-  color: #6ee7b7;
-  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #86efac;
 }
 
 .visita-tiempo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
-  font-weight: 600;
-  color: #fdba74;
+  font-weight: 700;
+  color: #9a3412;
+  background: #ffedd5;
+  border: 1px solid #fed7aa;
+  padding: 3px 10px;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(154, 52, 18, 0.08);
 }
 
 .visita-content h4 {
-  margin: 0 0 4px;
+  margin: 4px 0 4px;
   font-size: 15px;
-  color: #ffffff;
+  color: var(--ink);
+  font-weight: 800;
 }
 
 .visita-content p {
   margin: 0;
   font-size: 13px;
-  color: var(--texto-sec);
+  color: var(--ink-2);
   line-height: 1.45;
 }
 
@@ -2844,8 +2868,8 @@ g[data-foco-id] {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--linea);
+  background: var(--paper-3);
+  border: 1px solid var(--line);
   border-radius: 18px;
   margin-bottom: 20px;
 }
@@ -2854,7 +2878,7 @@ g[data-foco-id] {
   font-size: 24px;
   font-weight: 800;
   margin: 0 0 10px;
-  color: #ffffff;
+  color: var(--ink);
   letter-spacing: -0.01em;
 }
 
@@ -2881,7 +2905,7 @@ g[data-foco-id] {
   align-items: center;
   gap: 11px;
   font-size: 13.5px;
-  color: var(--texto);
+  color: var(--ink);
 }
 
 .portal-features li span {
@@ -2949,11 +2973,11 @@ g[data-foco-id] {
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 16px;
   margin-top: 20px;
-  background: rgba(13, 22, 39, 0.7);
-  border: 1px solid var(--linea);
+  background: var(--paper-2);
+  border: 1px solid var(--line);
   border-radius: 18px;
   padding: 22px 28px;
-  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(31, 56, 50, 0.04), 0 12px 32px -4px rgba(31, 56, 50, 0.05);
 }
 
 .lkpi-item {
@@ -2968,14 +2992,14 @@ g[data-foco-id] {
   font-family: var(--mono);
   font-size: 28px;
   font-weight: 800;
-  color: #38bdf8;
+  color: var(--forest);
   letter-spacing: -0.02em;
 }
 
 .lkpi-lbl {
   font-size: 11.5px;
-  font-weight: 600;
-  color: var(--tenue);
+  font-weight: 700;
+  color: var(--ink);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
