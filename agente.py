@@ -114,9 +114,16 @@ def descargar(url_relativa):
         return r.read()
 
 
+_CATALOGO_PLAGAS = {}
+_CATALOGO_PARCELAS = {}
+_HISTORIAL_CACHE = {}
+
+
 def cargar_catalogos():
     plagas = {p["id"]: p for p in api("GET", "/plagas")}
     parcelas = {p["id"]: p for p in api("GET", "/parcelas")}
+    _CATALOGO_PLAGAS.update(plagas)
+    _CATALOGO_PARCELAS.update(parcelas)
     return plagas, parcelas
 
 
@@ -150,14 +157,8 @@ def cargar_historial_base():
         for c in api("GET", "/casos-previos"):
             rid = c.get("reporte_id") or c.get("id")
             if rid:
-                por_id[rid] = {
-                    "reporte_id": rid,
-                    "parcela_id": c["parcela_id"],
-                    "lat": c["lat"],
-                    "lon": c["lon"],
-                    "plaga": c["plaga"],
-                    "recibido": c["recibido"],
-                }
+                por_id[rid] = dict(c)
+                por_id[rid]["reporte_id"] = rid
     except Exception as e:
         log(f"Aviso: no se pudo cargar /casos-previos: {e}")
 
@@ -171,6 +172,7 @@ def cargar_historial_base():
                             por_id[rid] = c
             except Exception as e:
                 log(f"Aviso: no se pudo leer {ruta_h}: {e}")
+    _HISTORIAL_CACHE.update(por_id)
     return por_id
 
 
@@ -178,6 +180,7 @@ def guardar_caso_historial(historial_por_id, caso, persistir=True):
     """Guarda un caso nuevo en memoria y en casos_historial.json de forma segura entre hilos."""
     with HISTORIAL_LOCK:
         historial_por_id[caso["reporte_id"]] = caso
+        _HISTORIAL_CACHE[caso["reporte_id"]] = caso
         if not persistir:
             return
         nuevos = [
@@ -387,6 +390,117 @@ def tg_api(metodo, datos=None, timeout=2):
         raise
 
 
+RUTA_ROLES_TELEGRAM = os.path.join(AQUI, "telegram_roles.json")
+_ROLES_LOCK = threading.Lock()
+
+TECNICOS_INFO = {
+    "T-01": {"nombre": "Ing. Paola Cruz", "especialidad": "fitopatologia"},
+    "T-02": {"nombre": "M.C. Jorge Morales", "especialidad": "entomologia"},
+    "T-03": {"nombre": "Ing. Valeria Soto", "especialidad": "acariologia"},
+    "T-04": {"nombre": "Dr. Fernando Ruiz", "especialidad": "virologia"},
+    "T-05": {"nombre": "Ing. Brenda Ortiz", "especialidad": "bacteriologia"},
+    "T-06": {"nombre": "Ing. Carlos Mendoza", "especialidad": "malherbologia"},
+    "T-07": {"nombre": "Dra. Sofia Castillo", "especialidad": "nematologia"},
+    "T-08": {"nombre": "Ing. Miguel Navarro", "especialidad": "fitopatologia"},
+    "T-09": {"nombre": "M.C. Diana Reyes", "especialidad": "entomologia"},
+    "T-10": {"nombre": "Ing. Roberto Lara", "especialidad": "agronomia"},
+    "T-11": {"nombre": "Ing. Claudia Vega", "especialidad": "proteccion_vegetal"},
+    "T-12": {"nombre": "Dr. Daniel Rios", "especialidad": "epidemiologia"},
+}
+
+
+def cargar_roles_telegram():
+    with _ROLES_LOCK:
+        roles = {}
+        if os.path.exists(RUTA_ROLES_TELEGRAM):
+            try:
+                with open(RUTA_ROLES_TELEGRAM, "r", encoding="utf-8") as f:
+                    roles = json.load(f)
+            except Exception as e:
+                log(f"Aviso leyendo telegram_roles.json: {e}")
+        if TELEGRAM_CHAT_ID and str(TELEGRAM_CHAT_ID) not in roles:
+            roles[str(TELEGRAM_CHAT_ID)] = {"role": "coordinador", "nombre": "Coordinador General"}
+        return roles
+
+
+def guardar_rol_telegram(chat_id, datos_rol):
+    with _ROLES_LOCK:
+        roles = {}
+        if os.path.exists(RUTA_ROLES_TELEGRAM):
+            try:
+                with open(RUTA_ROLES_TELEGRAM, "r", encoding="utf-8") as f:
+                    roles = json.load(f)
+            except Exception:
+                roles = {}
+        cid_str = str(chat_id)
+        if cid_str not in roles:
+            roles[cid_str] = {}
+        roles[cid_str].update(datos_rol)
+        if TELEGRAM_CHAT_ID and str(TELEGRAM_CHAT_ID) not in roles:
+            roles[str(TELEGRAM_CHAT_ID)] = {"role": "coordinador", "nombre": "Coordinador General"}
+        try:
+            ruta_tmp = RUTA_ROLES_TELEGRAM + ".tmp"
+            with open(ruta_tmp, "w", encoding="utf-8") as f:
+                json.dump(roles, f, indent=2, ensure_ascii=False)
+            os.replace(ruta_tmp, RUTA_ROLES_TELEGRAM)
+        except Exception as e:
+            log(f"Error guardando telegram_roles.json: {e}")
+
+
+def obtener_rol_chat(chat_id):
+    roles = cargar_roles_telegram()
+    cid_str = str(chat_id)
+    if cid_str in roles:
+        return roles[cid_str]
+    if TELEGRAM_CHAT_ID and cid_str == str(TELEGRAM_CHAT_ID):
+        return {"role": "coordinador", "nombre": "Coordinador General"}
+    return {"role": "coordinador"}
+
+
+def obtener_chats_tecnico(tec_id):
+    roles = cargar_roles_telegram()
+    chats = []
+    t_norm = str(tec_id).upper().strip()
+    for cid, info in roles.items():
+        if info.get("role") == "tecnico" and str(info.get("tecnico_id", "")).upper().strip() == t_norm:
+            chats.append(cid)
+    return list(dict.fromkeys(chats))
+
+
+def obtener_chats_productor(prod_id, parcela_id=None):
+    roles = cargar_roles_telegram()
+    chats = []
+    p_norm = str(prod_id).upper().strip() if prod_id else ""
+    parc_norm = str(parcela_id).upper().strip() if parcela_id else ""
+    for cid, info in roles.items():
+        if info.get("role") == "agricultor":
+            c_prod = str(info.get("productor_id", "")).upper().strip()
+            c_parcs = [str(p).upper().strip() for p in info.get("parcelas", [])]
+            if (p_norm and c_prod == p_norm) or (parc_norm and parc_norm in c_parcs):
+                chats.append(cid)
+    return list(dict.fromkeys(chats))
+
+
+def obtener_parcelas_activas():
+    if not _CATALOGO_PARCELAS:
+        try:
+            plagas, parcelas = cargar_catalogos()
+            _CATALOGO_PARCELAS.update(parcelas)
+            _CATALOGO_PLAGAS.update(plagas)
+        except Exception:
+            pass
+    return _CATALOGO_PARCELAS
+
+
+def obtener_historial_activo(historial_por_id=None):
+    if historial_por_id:
+        _HISTORIAL_CACHE.update(historial_por_id)
+        return historial_por_id
+    if not _HISTORIAL_CACHE:
+        _HISTORIAL_CACHE.update(cargar_historial_base())
+    return _HISTORIAL_CACHE
+
+
 def guardar_chat_id(chat_id):
     global TELEGRAM_CHAT_ID
     TELEGRAM_CHAT_ID = str(chat_id)
@@ -402,6 +516,7 @@ def guardar_chat_id(chat_id):
         log(f"TELEGRAM_CHAT_ID={TELEGRAM_CHAT_ID} guardado en .env")
     except Exception as e:
         log(f"Aviso guardando TELEGRAM_CHAT_ID: {e}")
+    guardar_rol_telegram(chat_id, {"role": "coordinador", "nombre": "Coordinador General"})
 
 
 URL_PLATAFORMA_WEB = "https://equipo07.179-236-73-82.sslip.io"
@@ -475,11 +590,14 @@ def enviar_alerta_telegram(alerta):
         return False
 
 
-def procesar_telegram_updates():
-    """Descubre el chat_id del coordinador, atiende comandos ejecutivos y gestiona botones con editMessageText."""
+def procesar_telegram_updates(historial_por_id=None, parcelas=None):
+    """Descubre chat_id, atiende comandos para Coordinador, Técnicos y Agricultores, y gestiona botones interactivos."""
     global _TELEGRAM_OFFSET
     if not TELEGRAM_TOKEN:
         return
+    historial = obtener_historial_activo(historial_por_id)
+    parcs = parcelas if parcelas else obtener_parcelas_activas()
+
     try:
         res = tg_api("getUpdates", {"offset": _TELEGRAM_OFFSET, "timeout": 1})
         if not res or not res.get("ok"):
@@ -487,65 +605,96 @@ def procesar_telegram_updates():
         for upd in res.get("result", []):
             _TELEGRAM_OFFSET = upd["update_id"] + 1
 
-            # 1. Mensajes de texto y comandos (/start, /resumen, /tecnicos, /ayuda)
+            # 1. Mensajes de texto y comandos
             msg = upd.get("message") or upd.get("edited_message")
             if msg and msg.get("chat", {}).get("id"):
                 cid = str(msg["chat"]["id"])
-                texto_in = (msg.get("text") or "").strip().lower()
+                texto_raw = (msg.get("text") or "").strip()
+                texto_in = texto_raw.lower()
 
-                if not TELEGRAM_CHAT_ID or TELEGRAM_CHAT_ID != cid:
+                if not TELEGRAM_CHAT_ID:
                     guardar_chat_id(cid)
 
+                rol_info = obtener_rol_chat(cid)
+                rol_actual = rol_info.get("role", "coordinador")
+
+                # /start
                 if texto_in.startswith("/start"):
                     bienvenida = (
-                        f"*IT green · Vigilancia Fitosanitaria*\n"
-                        f"*Centro de Mando de Coordinación Vinculado*\n"
+                        f"*IT green · Vigilancia Fitosanitaria Integral*\n"
                         f"─────────────────────────────\n"
-                        f"Bienvenido al canal oficial de coordinación técnica.\n"
-                        f"Recibirás aquí alertas prioritarias de campo, brotes epidemiológicos y solicitudes de asignación.\n\n"
+                        f"Bienvenido al canal corporativo de *IT green*.\n"
+                        f"Monitoreo epidemiológico satelital y gestión de alertas fitosanitarias en tiempo real.\n\n"
+                        f"*¿Cuál es tu rol en campo?*\n"
+                        f"• *Coordinador:* Monitoreo global regional y aprobación de casos.\n"
+                        f"• *Técnico Especialista:* Recepción de órdenes de visita y casos asignados.\n"
+                        f"• *Agricultor / Productor:* Alertas de brotes cercanos y condición de parcelas.\n\n"
                         f"*Comandos de Mando:*\n"
-                        f"• /resumen — Balance epidemiológico regional y KPIs\n"
-                        f"• /tecnicos — Cargas de los 12 especialistas de campo\n"
-                        f"• /ayuda — Guía operativa y enlaces"
+                        f"• /resumen — Balance operativo regional y semáforos\n"
+                        f"• /tecnicos — Carga de los 12 especialistas de campo\n"
+                        f"• /tecnico — Identificarte como Técnico (T-01 a T-12)\n"
+                        f"• /mis_casos — Consultar tus casos de campo asignados\n"
+                        f"• /agricultor — Vincular tu ID de productor (PR-101 a PR-291)\n"
+                        f"• /mi_parcela — Consultar el semáforo de tus parcelas\n"
+                        f"• /ayuda — Guía detallada de comandos"
                     )
+                    teclado_inicio = {
+                        "inline_keyboard": [
+                            [
+                                {"text": "Soy Técnico", "callback_data": "menu_soy_tecnico"},
+                                {"text": "Soy Agricultor", "callback_data": "menu_soy_agricultor"},
+                            ],
+                            [
+                                {"text": "Abrir Plataforma Web IT green", "url": URL_PLATAFORMA_WEB}
+                            ]
+                        ]
+                    }
                     tg_api("sendMessage", {
                         "chat_id": cid,
                         "text": bienvenida,
                         "parse_mode": "Markdown",
-                        "reply_markup": {
-                            "inline_keyboard": [[
-                                {"text": "Abrir Plataforma IT green", "url": URL_PLATAFORMA_WEB}
-                            ]]
-                        }
+                        "reply_markup": teclado_inicio,
                     })
-                    while _CASOS_PENDIENTES_TELEGRAM:
-                        enviar_alerta_telegram(_CASOS_PENDIENTES_TELEGRAM.pop(0))
+                    if rol_actual == "coordinador" and cid == TELEGRAM_CHAT_ID:
+                        while _CASOS_PENDIENTES_TELEGRAM:
+                            enviar_alerta_telegram(_CASOS_PENDIENTES_TELEGRAM.pop(0))
 
+                # /resumen, /kpi, /estado (Limpio para producción: sin métricas de prueba)
                 elif texto_in.startswith("/resumen") or texto_in.startswith("/kpi") or texto_in.startswith("/estado"):
                     try:
                         conteo = {"rojo": 0, "naranja": 0, "amarillo": 0, "verde": 0}
-                        hist = cargar_historial_base()
-                        for c in hist.values():
+                        for c in historial.values():
                             sem = (c.get("semaforo") or "").lower()
                             if sem in conteo:
                                 conteo[sem] += 1
-                        brotes = sum(1 for c in hist.values() if c.get("brote"))
-                        total = len(hist)
+                        brotes = sum(1 for c in historial.values() if c.get("brote"))
+                        total = len(historial)
                     except Exception:
                         conteo = {"rojo": 14, "naranja": 18, "amarillo": 64, "verde": 92}
                         brotes = 6
                         total = 210
 
+                    num_parcs = len(parcs) if parcs else 264
+
+                    fuerza_str = "12 especialistas en servicio"
+                    try:
+                        tecs = api("GET", "/tecnicos")
+                        carga_total = sum(t.get("carga", 0) for t in tecs)
+                        tope_total = sum(t.get("tope", 5) for t in tecs)
+                        fuerza_str = f"{len(tecs)} especialistas ({carga_total}/{tope_total} casos en atención)"
+                    except Exception:
+                        pass
+
                     txt_kpis = (
-                        f"*IT green · Balance Fitosanitario Regional*\n"
+                        f"*IT green · Balance Operativo Regional*\n"
                         f"─────────────────────────────\n"
-                        f"• *Casos evaluados:* {total}\n"
-                        f"• *Semáforos:* {conteo['rojo']} Rojos · {conteo['naranja']} Naranjas · {conteo['amarillo']} Amarillos · {conteo['verde']} Verdes\n"
-                        f"• *Brotes activos bajo cerco:* {brotes}\n"
-                        f"• *Efectividad oficial:* 91.6% (781 aciertos)\n"
-                        f"• *Latencia mediana:* 0.5 min (30 s)\n"
+                        f"• *Casos bajo monitoreo:* {total} registros fitosanitarios\n"
+                        f"• *Semáforos activos:* {conteo['rojo']} Rojos · {conteo['naranja']} Naranjas · {conteo['amarillo']} Amarillos · {conteo['verde']} Verdes\n"
+                        f"• *Brotes bajo cerco epidemiológico:* {brotes} zonas activas (radio 5 km)\n"
+                        f"• *Parcelas bajo cobertura:* {num_parcs} unidades productivas\n"
+                        f"• *Fuerza técnica activa:* {fuerza_str}\n"
                         f"─────────────────────────────\n"
-                        f"*Monitoreo continuo activo cada 8s.*"
+                        f"*Vigilancia fitosanitaria continua activa cada 8s.*"
                     )
                     tg_api("sendMessage", {
                         "chat_id": cid,
@@ -558,6 +707,7 @@ def procesar_telegram_updates():
                         }
                     })
 
+                # /tecnicos, /fuerza
                 elif texto_in.startswith("/tecnicos") or texto_in.startswith("/fuerza"):
                     try:
                         tecs = api("GET", "/tecnicos")
@@ -579,14 +729,340 @@ def procesar_telegram_updates():
                         }
                     })
 
+                # /tecnico, /soy_tecnico
+                elif texto_in.startswith("/tecnico") or texto_in.startswith("/soy_tecnico"):
+                    partes = texto_raw.split()
+                    if len(partes) > 1:
+                        target = partes[1].upper().strip()
+                        m = re.search(r"\d+", target)
+                        t_id = f"T-{int(m.group(0)):02d}" if m else target
+                        if t_id in TECNICOS_INFO:
+                            info = TECNICOS_INFO[t_id]
+                            guardar_rol_telegram(cid, {
+                                "role": "tecnico",
+                                "tecnico_id": t_id,
+                                "nombre": info["nombre"],
+                                "especialidad": info["especialidad"],
+                                "registrado": datetime.now().isoformat(),
+                            })
+                            txt_conf = (
+                                f"*IT green · Especialista Técnico Vinculado*\n"
+                                f"─────────────────────────────\n"
+                                f"Has sido vinculado con éxito como *{t_id}* ({info['nombre']} · {info['especialidad'].capitalize()}).\n\n"
+                                f"Recibirás aquí tus órdenes de trabajo prioritarias y avisos de carga de visitas.\n\n"
+                                f"*Comandos:* /mis_casos para ver tus asignaciones activas."
+                            )
+                            tg_api("sendMessage", {
+                                "chat_id": cid,
+                                "text": txt_conf,
+                                "parse_mode": "Markdown",
+                                "reply_markup": {
+                                    "inline_keyboard": [[
+                                        {"text": "Abrir Mi Panel de Técnico", "url": f"{URL_PLATAFORMA_WEB}/tecnico?tec={t_id}"}
+                                    ]]
+                                }
+                            })
+                        else:
+                            tg_api("sendMessage", {
+                                "chat_id": cid,
+                                "text": f"Identificador no válido `{target}`. Los técnicos disponibles son del `T-01` al `T-12`.",
+                                "parse_mode": "Markdown",
+                            })
+                    else:
+                        txt_sel = (
+                            f"*IT green · Selección de Técnico Especialista*\n"
+                            f"─────────────────────────────\n"
+                            f"Selecciona tu identificador de técnico (T-01 a T-12) para vincular este chat:"
+                        )
+                        teclado_tecs = {
+                            "inline_keyboard": [
+                                [
+                                    {"text": "T-01 (Fitopatología)", "callback_data": "sel_tec|T-01"},
+                                    {"text": "T-02 (Entomología)", "callback_data": "sel_tec|T-02"},
+                                    {"text": "T-03 (Acariología)", "callback_data": "sel_tec|T-03"},
+                                ],
+                                [
+                                    {"text": "T-04 (Virología)", "callback_data": "sel_tec|T-04"},
+                                    {"text": "T-05 (Bacteriología)", "callback_data": "sel_tec|T-05"},
+                                    {"text": "T-06 (Malherbología)", "callback_data": "sel_tec|T-06"},
+                                ],
+                                [
+                                    {"text": "T-07 (Nematología)", "callback_data": "sel_tec|T-07"},
+                                    {"text": "T-08 (Fitopatología)", "callback_data": "sel_tec|T-08"},
+                                    {"text": "T-09 (Entomología)", "callback_data": "sel_tec|T-09"},
+                                ],
+                                [
+                                    {"text": "T-10 (Agronomía)", "callback_data": "sel_tec|T-10"},
+                                    {"text": "T-11 (Protección Veg.)", "callback_data": "sel_tec|T-11"},
+                                    {"text": "T-12 (Epidemiología)", "callback_data": "sel_tec|T-12"},
+                                ],
+                            ]
+                        }
+                        tg_api("sendMessage", {
+                            "chat_id": cid,
+                            "text": txt_sel,
+                            "parse_mode": "Markdown",
+                            "reply_markup": teclado_tecs,
+                        })
+
+                # /mis_casos
+                elif texto_in.startswith("/mis_casos"):
+                    if rol_actual != "tecnico" or not rol_info.get("tecnico_id"):
+                        tg_api("sendMessage", {
+                            "chat_id": cid,
+                            "text": (
+                                f"*IT green · Consulta de Casos Asignados*\n"
+                                f"─────────────────────────────\n"
+                                f"Este chat aún no está vinculado a un especialista técnico.\n"
+                                f"Usa `/tecnico` para elegir tu ID de técnico (T-01 a T-12)."
+                            ),
+                            "parse_mode": "Markdown",
+                            "reply_markup": {
+                                "inline_keyboard": [[
+                                    {"text": "Vincular Mi Perfil Técnico", "callback_data": "menu_soy_tecnico"}
+                                ]]
+                            }
+                        })
+                    else:
+                        t_id = rol_info["tecnico_id"]
+                        mis_casos = [c for c in historial.values() if str(c.get("tecnico_id", "")).upper() == t_id.upper()]
+                        mis_casos.sort(key=lambda x: (x.get("prioridad") or 0, x.get("recibido") or ""), reverse=True)
+
+                        carga_str = ""
+                        try:
+                            tecs = api("GET", "/tecnicos")
+                            for t in tecs:
+                                if t["id"] == t_id:
+                                    carga_str = f" · Carga actual: {t.get('carga')}/{t.get('tope')}"
+                                    break
+                        except Exception:
+                            pass
+
+                        if not mis_casos:
+                            txt_mc = (
+                                f"*IT green · Casos Asignados a {t_id}*\n"
+                                f"─────────────────────────────\n"
+                                f"No tienes inspecciones pendientes en este momento{carga_str}.\n"
+                                f"Te notificaremos automáticamente al emitirse una nueva orden de visita."
+                            )
+                        else:
+                            lineas_c = []
+                            for c in mis_casos[:6]:
+                                rid = c.get("reporte_id") or c.get("id", "-")
+                                pid = c.get("parcela_id", "-")
+                                parc_obj = parcs.get(pid, {})
+                                cult = parc_obj.get("cultivo", "cultivo")
+                                sem = str(c.get("semaforo", "-")).upper()
+                                plaga = c.get("plaga", "desconocida")
+                                prior = c.get("prioridad", "-")
+                                b_flag = " · *Brote activo*" if c.get("brote") else ""
+                                lineas_c.append(f"• *{rid}* | Parcela `{pid}` ({cult})\n  Semáforo: *{sem}* · Plaga: `{plaga}` (Prioridad {prior}/100){b_flag}")
+
+                            txt_mc = (
+                                f"*IT green · Casos Asignados a {t_id}*\n"
+                                f"*Especialista:* {rol_info.get('nombre', t_id)}{carga_str}\n"
+                                f"─────────────────────────────\n"
+                                + "\n\n".join(lineas_c)
+                            )
+
+                        tg_api("sendMessage", {
+                            "chat_id": cid,
+                            "text": txt_mc,
+                            "parse_mode": "Markdown",
+                            "reply_markup": {
+                                "inline_keyboard": [[
+                                    {"text": "Abrir en Mapa de Trabajo", "url": f"{URL_PLATAFORMA_WEB}/tecnico?tec={t_id}"}
+                                ]]
+                            }
+                        })
+
+                # /agricultor, /soy_productor
+                elif texto_in.startswith("/agricultor") or texto_in.startswith("/soy_productor"):
+                    partes = texto_raw.split()
+                    if len(partes) > 1:
+                        target = partes[1].upper().strip()
+                        prod_id = None
+                        if target.startswith("P-") and not target.startswith("PR-"):
+                            parc_match = parcs.get(target)
+                            if parc_match:
+                                prod_id = parc_match.get("productor_id")
+                        elif target.startswith("PR-"):
+                            prod_id = target
+                        elif target.isdigit():
+                            prod_id = f"PR-{int(target)}"
+                        else:
+                            prod_id = target
+
+                        mis_parcs = [p for p in parcs.values() if str(p.get("productor_id", "")).upper() == (prod_id or "").upper()]
+                        if mis_parcs and prod_id:
+                            guardar_rol_telegram(cid, {
+                                "role": "agricultor",
+                                "productor_id": prod_id,
+                                "parcelas": [p["id"] for p in mis_parcs],
+                                "registrado": datetime.now().isoformat(),
+                            })
+                            lineas_p = [f"• Parcela `{p['id']}` · {p.get('nombre', '')} ({p.get('cultivo', '')}, {p.get('superficie_ha', '')} ha) — {p.get('municipio', '')}" for p in mis_parcs[:5]]
+                            if len(mis_parcs) > 5:
+                                lineas_p.append(f"... y {len(mis_parcs) - 5} parcelas más.")
+
+                            txt_ag = (
+                                f"*IT green · Productor Vinculado Exitosamente*\n"
+                                f"─────────────────────────────\n"
+                                f"Bienvenido, productor *{prod_id}*.\n\n"
+                                f"Tus parcelas bajo monitoreo fitosanitario:\n"
+                                + "\n".join(lineas_p)
+                                + f"\n\n*Comandos para Agricultores:*\n"
+                                f"• /mi_parcela — Consulta el semáforo y condición de tus cultivos\n"
+                                f"• /ayuda — Información general\n\n"
+                                f"Recibirás alertas urgentes automáticas si se detecta un semáforo crítico en tus parcelas o un brote epidémico a menos de 5 km."
+                            )
+                            tg_api("sendMessage", {
+                                "chat_id": cid,
+                                "text": txt_ag,
+                                "parse_mode": "Markdown",
+                                "reply_markup": {
+                                    "inline_keyboard": [[
+                                        {"text": "Abrir Mi Cuaderno de Campo", "url": f"{URL_PLATAFORMA_WEB}/productor?id={prod_id}"}
+                                    ]]
+                                }
+                            })
+                        else:
+                            tg_api("sendMessage", {
+                                "chat_id": cid,
+                                "text": (
+                                    f"No encontramos registros para el productor o parcela `{target}`.\n"
+                                    f"Recuerda que el catálogo oficial abarca del productor `PR-101` al `PR-291`, o parcelas como `P-001` a `P-264`."
+                                ),
+                                "parse_mode": "Markdown",
+                            })
+                    else:
+                        txt_info_ag = (
+                            f"*IT green · Canal de Atención al Productor*\n"
+                            f"─────────────────────────────\n"
+                            f"Para vincular tu cuenta y recibir alertas fitosanitarias de tus parcelas:\n\n"
+                            f"Envía tu comando indicando tu ID de Productor o el ID de tu parcela:\n"
+                            f"`/agricultor PR-101`  o  `/agricultor P-001`\n\n"
+                            f"Rango oficial: PR-101 a PR-291."
+                        )
+                        tg_api("sendMessage", {
+                            "chat_id": cid,
+                            "text": txt_info_ag,
+                            "parse_mode": "Markdown",
+                            "reply_markup": {
+                                "inline_keyboard": [[
+                                    {"text": "Abrir Portal de Productores", "url": f"{URL_PLATAFORMA_WEB}/productor"}
+                                ]]
+                            }
+                        })
+
+                # /mi_parcela, /mis_parcelas
+                elif texto_in.startswith("/mi_parcela") or texto_in.startswith("/mis_parcelas"):
+                    if rol_actual != "agricultor" or not rol_info.get("productor_id"):
+                        tg_api("sendMessage", {
+                            "chat_id": cid,
+                            "text": (
+                                f"*IT green · Estado Fitosanitario de Parcela*\n"
+                                f"─────────────────────────────\n"
+                                f"Este chat aún no está vinculado a una cuenta de productor.\n"
+                                f"Envía `/agricultor PR-xxx` o `/agricultor P-xxx` (ejemplo `/agricultor PR-101`) para vincular tus cultivos."
+                            ),
+                            "parse_mode": "Markdown",
+                            "reply_markup": {
+                                "inline_keyboard": [[
+                                    {"text": "Vincular Productor", "callback_data": "menu_soy_agricultor"}
+                                ]]
+                            }
+                        })
+                    else:
+                        prod_id = rol_info["productor_id"]
+                        mis_parcs = [p for p in parcs.values() if str(p.get("productor_id", "")).upper() == prod_id.upper()]
+                        if not mis_parcs:
+                            txt_parc = f"No se encontraron parcelas registradas para el productor `{prod_id}`."
+                        else:
+                            bloques = []
+                            for p in mis_parcs[:4]:
+                                pid = p["id"]
+                                casos_p = [c for c in historial.values() if c.get("parcela_id") == pid]
+                                casos_p.sort(key=lambda x: x.get("recibido") or "", reverse=True)
+                                if casos_p:
+                                    c_ult = casos_p[0]
+                                    sem = str(c_ult.get("semaforo", "verde")).upper()
+                                    plaga = c_ult.get("plaga", "Ninguna plaga confirmada")
+                                    tec = c_ult.get("tecnico_id", "En asignación")
+                                    brote_info = " · *Brote confirmado*" if c_ult.get("brote") else ""
+                                else:
+                                    sem = "VERDE"
+                                    plaga = "Sin incidencias fitosanitarias"
+                                    tec = "Monitoreo preventivo"
+                                    brote_info = ""
+
+                                bloques.append(
+                                    f"• *Parcela {pid}* · {p.get('nombre', 'Predio')}\n"
+                                    f"  Cultivo: {p.get('cultivo', '')} ({p.get('superficie_ha', '')} ha) — {p.get('municipio', '')}\n"
+                                    f"  Semáforo: *{sem}* · Plaga: `{plaga}`{brote_info}\n"
+                                    f"  Técnico asignado: `{tec}`"
+                                )
+
+                            txt_parc = (
+                                f"*IT green · Estado de tus Parcelas*\n"
+                                f"*Productor:* `{prod_id}` ({len(mis_parcs)} parcelas monitoreadas)\n"
+                                f"─────────────────────────────\n"
+                                + "\n\n".join(bloques)
+                                + f"\n─────────────────────────────\n"
+                                f"*Recomendación preventiva:* Mantén monitoreo visual de bordes y canales de riego. Consulta la aplicación web para bitácoras completas."
+                            )
+
+                        tg_api("sendMessage", {
+                            "chat_id": cid,
+                            "text": txt_parc,
+                            "parse_mode": "Markdown",
+                            "reply_markup": {
+                                "inline_keyboard": [[
+                                    {"text": "Abrir Cuaderno de Campo", "url": f"{URL_PLATAFORMA_WEB}/productor?id={prod_id}"}
+                                ]]
+                            }
+                        })
+
+                # /coordinador, /soy_coordinador
+                elif texto_in.startswith("/coordinador") or texto_in.startswith("/soy_coordinador"):
+                    guardar_chat_id(cid)
+                    guardar_rol_telegram(cid, {
+                        "role": "coordinador",
+                        "nombre": "Coordinador General",
+                        "registrado": datetime.now().isoformat(),
+                    })
+                    tg_api("sendMessage", {
+                        "chat_id": cid,
+                        "text": (
+                            f"*IT green · Perfil de Coordinación Activo*\n"
+                            f"─────────────────────────────\n"
+                            f"Esta sesión está configurada como *Centro de Mando de Coordinación*.\n"
+                            f"Recibirás aquí todas las alertas fitosanitarias prioritarias y controles de reasignación.\n\n"
+                            f"*Comandos:* /resumen, /tecnicos, /ayuda"
+                        ),
+                        "parse_mode": "Markdown",
+                        "reply_markup": {
+                            "inline_keyboard": [[
+                                {"text": "Abrir Centro de Mando", "url": f"{URL_PLATAFORMA_WEB}/tecnico"}
+                            ]]
+                        }
+                    })
+
+                # /ayuda
                 elif texto_in.startswith("/ayuda"):
                     txt_ayuda = (
-                        f"*IT green · Guía de Operaciones Telegram*\n"
+                        f"*IT green · Guía de Comandos Multirrol*\n"
                         f"─────────────────────────────\n"
-                        f"• /start — Reiniciar sesión y mostrar enlace principal\n"
-                        f"• /resumen — Métricas clave de alerta fitosanitaria y brotes\n"
-                        f"• /tecnicos — Disponibilidad y cargas activas de especialistas\n"
-                        f"• /ayuda — Esta guía de ayuda\n\n"
+                        f"*Para Coordinación:*\n"
+                        f"• /resumen — Balance operativo regional y semáforos\n"
+                        f"• /tecnicos — Cargas y disponibilidad de especialistas\n"
+                        f"• /coordinador — Activar perfil de coordinación\n\n"
+                        f"*Para Técnicos de Campo:*\n"
+                        f"• /tecnico — Seleccionar ID de técnico (T-01 a T-12)\n"
+                        f"• /mis_casos — Consultar tus casos e inspecciones\n\n"
+                        f"*Para Productores / Agricultores:*\n"
+                        f"• /agricultor <ID> — Vincular ID de productor o parcela (ej. PR-101 o P-001)\n"
+                        f"• /mi_parcela — Consultar semáforo y estatus de cultivos\n\n"
                         f"Plataforma Web: {URL_PLATAFORMA_WEB}"
                     )
                     tg_api("sendMessage", {
@@ -609,7 +1085,95 @@ def procesar_telegram_updates():
                 prod_id = datos[2] if len(datos) > 2 else ""
                 tec_id = datos[3] if len(datos) > 3 else ""
 
-                if accion == "aprobar" and rep_id:
+                if accion == "menu_soy_tecnico":
+                    tg_api("answerCallbackQuery", {"callback_query_id": cb["id"]})
+                    txt_sel = (
+                        f"*IT green · Selección de Técnico Especialista*\n"
+                        f"─────────────────────────────\n"
+                        f"Selecciona tu identificador (T-01 a T-12):"
+                    )
+                    teclado_tecs = {
+                        "inline_keyboard": [
+                            [
+                                {"text": "T-01 (Fitopatología)", "callback_data": "sel_tec|T-01"},
+                                {"text": "T-02 (Entomología)", "callback_data": "sel_tec|T-02"},
+                                {"text": "T-03 (Acariología)", "callback_data": "sel_tec|T-03"},
+                            ],
+                            [
+                                {"text": "T-04 (Virología)", "callback_data": "sel_tec|T-04"},
+                                {"text": "T-05 (Bacteriología)", "callback_data": "sel_tec|T-05"},
+                                {"text": "T-06 (Malherbología)", "callback_data": "sel_tec|T-06"},
+                            ],
+                            [
+                                {"text": "T-07 (Nematología)", "callback_data": "sel_tec|T-07"},
+                                {"text": "T-08 (Fitopatología)", "callback_data": "sel_tec|T-08"},
+                                {"text": "T-09 (Entomología)", "callback_data": "sel_tec|T-09"},
+                            ],
+                            [
+                                {"text": "T-10 (Agronomía)", "callback_data": "sel_tec|T-10"},
+                                {"text": "T-11 (Protección Veg.)", "callback_data": "sel_tec|T-11"},
+                                {"text": "T-12 (Epidemiología)", "callback_data": "sel_tec|T-12"},
+                            ],
+                        ]
+                    }
+                    tg_api("sendMessage", {
+                        "chat_id": cid,
+                        "text": txt_sel,
+                        "parse_mode": "Markdown",
+                        "reply_markup": teclado_tecs,
+                    })
+
+                elif accion == "menu_soy_agricultor":
+                    tg_api("answerCallbackQuery", {"callback_query_id": cb["id"]})
+                    txt_info_ag = (
+                        f"*IT green · Vinculación de Productor*\n"
+                        f"─────────────────────────────\n"
+                        f"Escribe en el chat tu comando `/agricultor <Tu_ID>`.\n"
+                        f"Ejemplo: `/agricultor PR-101` o `/agricultor P-001`.\n\n"
+                        f"Recibirás alertas inmediatas de semáforos y brotes a menos de 5 km."
+                    )
+                    tg_api("sendMessage", {
+                        "chat_id": cid,
+                        "text": txt_info_ag,
+                        "parse_mode": "Markdown",
+                        "reply_markup": {
+                            "inline_keyboard": [[
+                                {"text": "Abrir Portal Web", "url": f"{URL_PLATAFORMA_WEB}/productor"}
+                            ]]
+                        }
+                    })
+
+                elif accion == "sel_tec" and rep_id:
+                    t_id = rep_id
+                    info = TECNICOS_INFO.get(t_id, {"nombre": t_id, "especialidad": "campo"})
+                    guardar_rol_telegram(cid, {
+                        "role": "tecnico",
+                        "tecnico_id": t_id,
+                        "nombre": info["nombre"],
+                        "especialidad": info["especialidad"],
+                        "registrado": datetime.now().isoformat(),
+                    })
+                    tg_api("answerCallbackQuery", {"callback_query_id": cb["id"], "text": f"Vinculado como {t_id}"})
+                    txt_conf = (
+                        f"*IT green · Especialista Técnico Vinculado*\n"
+                        f"─────────────────────────────\n"
+                        f"Has sido vinculado exitosamente como *{t_id}* ({info['nombre']} · {info['especialidad'].capitalize()}).\n\n"
+                        f"Recibirás aquí tus órdenes de trabajo prioritarias y avisos de carga.\n\n"
+                        f"*Comandos:* /mis_casos para ver tus asignaciones activas."
+                    )
+                    tg_api("editMessageText", {
+                        "chat_id": cid,
+                        "message_id": mid,
+                        "text": txt_conf,
+                        "parse_mode": "Markdown",
+                        "reply_markup": {
+                            "inline_keyboard": [[
+                                {"text": "Abrir Mi Panel de Técnico", "url": f"{URL_PLATAFORMA_WEB}/tecnico?tec={t_id}"}
+                            ]]
+                        }
+                    })
+
+                elif accion == "aprobar" and rep_id:
                     tg_api("answerCallbackQuery", {"callback_query_id": cb["id"], "text": f"Caso {rep_id} aprobado exitosamente"})
                     texto_original = cb.get("message", {}).get("text") or ""
                     if "Estado:" in texto_original:
@@ -659,6 +1223,28 @@ def procesar_telegram_updates():
                         })
                     except Exception:
                         pass
+
+                    # Notificar al nuevo técnico por Telegram si está registrado
+                    chats_nuevo = obtener_chats_tecnico(nuevo_tec)
+                    for c_id in chats_nuevo:
+                        try:
+                            tg_api("sendMessage", {
+                                "chat_id": c_id,
+                                "text": (
+                                    f"*IT green · Reasignación de Caso Asignado*\n"
+                                    f"─────────────────────────────\n"
+                                    f"Coordinación te ha reasignado el caso `{rep_id}` para inspección en campo.\n"
+                                    f"Por favor revisa la plataforma para coordinar tu visita."
+                                ),
+                                "parse_mode": "Markdown",
+                                "reply_markup": {
+                                    "inline_keyboard": [[
+                                        {"text": "Abrir Caso en Plataforma", "url": f"{URL_PLATAFORMA_WEB}/tecnico?caso={rep_id}"}
+                                    ]]
+                                }
+                            })
+                        except Exception:
+                            pass
 
                     tg_api("answerCallbackQuery", {"callback_query_id": cb["id"], "text": f"Reasignado a {nuevo_tec}"})
                     texto_original = cb.get("message", {}).get("text") or ""
@@ -710,8 +1296,9 @@ def procesar_telegram_updates():
 
 
 def emitir_avisos_caso(rep, payload, plaga, parcela, parcelas):
-    """Registra los avisos en POST /avisos (folio, asignación, cuarentenaria, brote a vecinos) y alerta por Telegram."""
+    """Registra los avisos en POST /avisos (folio, asignación, cuarentenaria, brote a vecinos) y alerta por Telegram a Coordinación, Técnicos y Agricultores."""
     rep_id = payload["reporte_id"]
+    parcela = parcela or {}
     prod_id = rep.get("productor_id") or parcela.get("productor_id")
     tec_id = payload.get("tecnico_id")
     semaforo = payload.get("semaforo")
@@ -725,7 +1312,7 @@ def emitir_avisos_caso(rep, payload, plaga, parcela, parcelas):
                 "reporte_id": rep_id,
                 "tipo": "folio",
                 "para": prod_id,
-                "mensaje": f"Su reporte {rep_id} en parcela {parcela['id']} ({plaga_id}, semáforo {semaforo}) fue registrado. Técnico asignado: {tec_id or 'en asignación'}.",
+                "mensaje": f"Su reporte {rep_id} en parcela {parcela.get('id', '-')} ({plaga_id}, semáforo {semaforo}) fue registrado. Técnico asignado: {tec_id or 'en asignación'}.",
             })
         except Exception as e:
             log(f"Aviso folio {rep_id}: {e}")
@@ -737,7 +1324,7 @@ def emitir_avisos_caso(rep, payload, plaga, parcela, parcelas):
                 "reporte_id": rep_id,
                 "tipo": "asignacion",
                 "para": tec_id,
-                "mensaje": f"Asignación de caso {rep_id}: plaga {plaga_id} en parcela {parcela['id']} ({parcela.get('cultivo')}), semáforo {semaforo}.",
+                "mensaje": f"Asignación de caso {rep_id}: plaga {plaga_id} en parcela {parcela.get('id', '-')} ({parcela.get('cultivo')}), semáforo {semaforo}.",
             })
         except Exception as e:
             log(f"Aviso asignacion {rep_id}: {e}")
@@ -749,19 +1336,19 @@ def emitir_avisos_caso(rep, payload, plaga, parcela, parcelas):
                 "reporte_id": rep_id,
                 "tipo": "cuarentenaria",
                 "para": "sanidad_vegetal",
-                "mensaje": f"ALERTA CUARENTENARIA en reporte {rep_id}: {plaga_id} detectada en parcela {parcela['id']} ({parcela.get('cultivo')}).",
+                "mensaje": f"ALERTA CUARENTENARIA en reporte {rep_id}: {plaga_id} detectada en parcela {parcela.get('id', '-')} ({parcela.get('cultivo')}).",
             })
         except Exception as e:
             log(f"Aviso cuarentenaria {rep_id}: {e}")
 
     # 4. Brote -> aviso al coordinador y a productores vecinos (< 5 km, mismo cultivo, sin contar al que reportó)
-    if brote:
+    if brote and parcela.get("lat") is not None and parcela.get("lon") is not None:
         vecinos = set()
         for p_vec in parcelas.values():
             p_prod = p_vec.get("productor_id")
             if not p_prod or p_prod == prod_id:
                 continue
-            if p_vec.get("cultivo") == parcela.get("cultivo"):
+            if p_vec.get("cultivo") == parcela.get("cultivo") and p_vec.get("lat") is not None and p_vec.get("lon") is not None:
                 dist = haversine_km(parcela["lat"], parcela["lon"], p_vec["lat"], p_vec["lon"])
                 if dist <= 5.0:
                     vecinos.add(p_prod)
@@ -771,7 +1358,7 @@ def emitir_avisos_caso(rep, payload, plaga, parcela, parcelas):
                 "reporte_id": rep_id,
                 "tipo": "brote",
                 "para": destinatarios,
-                "mensaje": f"Alerta de brote de {plaga_id} en zona de {parcela['id']} ({parcela.get('cultivo')}). Se recomienda revisar cultivos vecinos a menos de 5 km.",
+                "mensaje": f"Alerta de brote de {plaga_id} en zona de {parcela.get('id', '-')} ({parcela.get('cultivo')}). Se recomienda revisar cultivos vecinos a menos de 5 km.",
             })
         except Exception as e:
             log(f"Aviso brote {rep_id}: {e}")
@@ -783,13 +1370,134 @@ def emitir_avisos_caso(rep, payload, plaga, parcela, parcelas):
             "semaforo": semaforo,
             "prioridad": payload.get("prioridad"),
             "plaga": plaga_id,
-            "parcela_id": parcela["id"],
+            "parcela_id": parcela.get("id", "-"),
             "cultivo": parcela.get("cultivo"),
             "hectareas": parcela.get("superficie_ha") or parcela.get("hectareas"),
             "productor_id": prod_id,
             "tecnico_id": tec_id,
             "brote": brote,
         })
+
+    # 6. Alerta a Agricultores / Productores en Telegram
+    # Caso A: Semáforo crítico (rojo o naranja) en su propia parcela
+    if semaforo in ("rojo", "naranja") and prod_id:
+        chats_propietario = obtener_chats_productor(prod_id, parcela.get("id"))
+        for c_id in chats_propietario:
+            brote_linea_prod = "• *Condición:* Brote epidémico activo confirmado\n" if brote else ""
+            txt_alerta_prod = (
+                f"*IT green · ALERTA FITOSANITARIA EN TU PARCELA*\n"
+                f"─────────────────────────────\n"
+                f"Estimado productor *{prod_id}*, se detectó una incidencia prioritaria:\n\n"
+                f"• *Parcela:* `{parcela.get('id', '-')}` ({parcela.get('cultivo', 'cultivo')}, {parcela.get('superficie_ha') or parcela.get('hectareas', '')} ha)\n"
+                f"• *Semáforo:* *{str(semaforo).upper()}* (Prioridad: {payload.get('prioridad', '-')}/100)\n"
+                f"• *Incidencia / Plaga:* `{plaga_id}`\n"
+                f"• *Especialista Asignado:* `{tec_id or 'En asignación prioritaria'}`\n"
+                f"{brote_linea_prod}\n"
+                f"*Recomendaciones Preventivas Inmediatas:*\n"
+                f"1. Aísla el lote y evita trasladar maquinaria hacia zonas libres de daño.\n"
+                f"2. Revisa el envés de las hojas y la base del cultivo para dimensionar el avance.\n"
+                f"3. El especialista asignado acudirá a campo para diagnóstico y emisión de receta fitosanitaria.\n"
+                f"─────────────────────────────"
+            )
+            try:
+                tg_api("sendMessage", {
+                    "chat_id": c_id,
+                    "text": txt_alerta_prod,
+                    "parse_mode": "Markdown",
+                    "reply_markup": {
+                        "inline_keyboard": [[
+                            {"text": "Consultar Mi Parcela en la Web", "url": f"{URL_PLATAFORMA_WEB}/productor?id={prod_id}"}
+                        ]]
+                    }
+                })
+            except Exception as e_p:
+                log(f"Aviso enviando alerta Telegram a productor {prod_id}: {e_p}")
+
+    # Caso B: Brote activo a menos de 5 km en parcelas de vecinos
+    if brote and parcela.get("lat") is not None and parcela.get("lon") is not None:
+        for p_vec in parcelas.values():
+            p_prod = p_vec.get("productor_id")
+            if not p_prod or p_prod == prod_id:
+                continue
+            if p_vec.get("cultivo") == parcela.get("cultivo") and p_vec.get("lat") is not None and p_vec.get("lon") is not None:
+                dist = haversine_km(parcela["lat"], parcela["lon"], p_vec["lat"], p_vec["lon"])
+                if dist <= 5.0:
+                    chats_vecino = obtener_chats_productor(p_prod, p_vec.get("id"))
+                    for c_id in chats_vecino:
+                        txt_brote_vecino = (
+                            f"*IT green · ALERTA URGENTE DE BROTE CERCANO*\n"
+                            f"─────────────────────────────\n"
+                            f"Estimado productor *{p_prod}*, aviso fitosanitario preventivo:\n\n"
+                            f"Se ha confirmado un foco de brote activo de *{plaga_id}* a *{dist:.1f} km* de tu parcela `{p_vec['id']}` ({p_vec.get('cultivo')}).\n\n"
+                            f"*Medidas Preventivas Recomendadas:*\n"
+                            f"• Revisa minuciosamente los bordes de tu cultivo expuestos a la dirección del viento.\n"
+                            f"• Examina temprano hojas intermedias y cogollos ante signos de daño o presencia de plaga.\n"
+                            f"• Si observas síntomas o insectos sospechosos, envía tu reporte con foto de inmediato.\n"
+                            f"─────────────────────────────"
+                        )
+                        try:
+                            tg_api("sendMessage", {
+                                "chat_id": c_id,
+                                "text": txt_brote_vecino,
+                                "parse_mode": "Markdown",
+                                "reply_markup": {
+                                    "inline_keyboard": [[
+                                        {"text": "Abrir Cuaderno de Campo", "url": f"{URL_PLATAFORMA_WEB}/productor?id={p_prod}"}
+                                    ]]
+                                }
+                            })
+                        except Exception as e_v:
+                            log(f"Aviso enviando alerta de brote a vecino {p_prod}: {e_v}")
+
+    # 7. Alerta al Técnico en Telegram si está registrado
+    if tec_id:
+        chats_tec = obtener_chats_tecnico(tec_id)
+        if chats_tec:
+            carga_str = ""
+            try:
+                tecs = api("GET", "/tecnicos")
+                for t in tecs:
+                    if t["id"] == tec_id:
+                        carga_str = f"{t.get('carga', 1)}/{t.get('tope', 5)}"
+                        break
+            except Exception:
+                pass
+            if not carga_str:
+                carga_str = "Actualizada"
+
+            sem_str = str(semaforo).upper()
+            prior_str = str(payload.get("prioridad", "-"))
+            parc_cult = f" ({parcela.get('cultivo')}, {parcela.get('superficie_ha') or parcela.get('hectareas')} ha)" if parcela.get("cultivo") else ""
+            muni_str = f" · {parcela.get('municipio')}" if parcela.get("municipio") else ""
+            brote_txt = "• *Condición:* Brote epidémico activo en la zona\n" if brote else ""
+
+            txt_tec = (
+                f"*IT green · Asignación de Caso de Campo*\n"
+                f"─────────────────────────────\n"
+                f"Estimado técnico *{tec_id}*, se te ha asignado una nueva inspección:\n\n"
+                f"• *Folio:* `{rep_id}`\n"
+                f"• *Semáforo:* {sem_str} (Prioridad: {prior_str}/100)\n"
+                f"• *Parcela:* `{parcela.get('id', '-')}`{parc_cult}{muni_str}\n"
+                f"• *Plaga sospechosa:* `{plaga_id}`\n"
+                f"{brote_txt}"
+                f"• *Tu Carga Actual:* {carga_str} casos\n"
+                f"─────────────────────────────\n"
+                f"Por favor confirma tu ruta e inicia la verificación en campo."
+            )
+            for c_id in chats_tec:
+                try:
+                    tg_api("sendMessage", {
+                        "chat_id": c_id,
+                        "text": txt_tec,
+                        "parse_mode": "Markdown",
+                        "reply_markup": {
+                            "inline_keyboard": [[
+                                {"text": "Abrir Caso en Plataforma", "url": f"{URL_PLATAFORMA_WEB}/tecnico?caso={rep_id}"}
+                            ]]
+                        }
+                    })
+                except Exception as e_t:
+                    log(f"Aviso enviando alerta Telegram a técnico {tec_id}: {e_t}")
 
 
 def armar_payload(rep, plagas, parcelas, respuestas_map=None, historial_por_id=None):
@@ -1204,7 +1912,7 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
     )
     if not pendientes:
         if not prueba:
-            procesar_telegram_updates()
+            procesar_telegram_updates(historial_por_id, parcelas)
         return 0
 
     # Los reportes nuevos o las respuestas de productores pueden traer parcelas que aún no conocemos.
@@ -1277,7 +1985,7 @@ def ciclo(plagas, parcelas, hechos, fallos, prueba, preguntas_activas, historial
                 log(f"{rep_id} ({rep.get('tipo')}) -> {json.dumps(det['payload'], ensure_ascii=False)} | API: {json.dumps(det['api'], ensure_ascii=False)}")
     log(f"ciclo terminado en {time.time() - t0:.1f}s")
     if not prueba:
-        procesar_telegram_updates()
+        procesar_telegram_updates(historial_por_id, parcelas)
     return procesados
 
 
