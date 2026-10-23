@@ -47,8 +47,8 @@ const estadoApp = {
   mostrarBasesTecnicos: true,
   incluirCasosPrevios: false,
 
-  // Selección en Vista Agricultor
-  productorActualId: "PR-101",
+  // Selección en Vista Agricultor (aislada por pestaña/sesión)
+  productorActualId: null,
   parcelaActual: null,
   plagaActual: null,
 };
@@ -377,15 +377,8 @@ function resolverVistaDesdeUrl() {
 
   if (path.includes("agricultor") || hash.includes("agricultor")) {
     if (!sesion || sesion.rol !== "agricultor") {
-      const prod = mapaProductores.get("PR-101");
-      const sesionDefault = {
-        rol: "agricultor",
-        id: "PR-101",
-        nombre: prod?.nombre || "Fidel Jiménez",
-        municipio: prod?.municipio || "Texcoco",
-      };
-      guardarSesion(sesionDefault);
-      aplicarSesion(sesionDefault);
+      setTimeout(() => abrirModalAuthAgricultor(), 150);
+      return "landing";
     }
     return "agricultor";
   }
@@ -499,12 +492,9 @@ window.addEventListener("popstate", () => {
   cambiarVista(vista, false);
 });
 
-// Brand/Logo vuelve al inicio si no hay sesión
+// Brand/Logo vuelve a la pantalla de inicio (Landing)
 document.querySelector("#brand-home")?.addEventListener("click", () => {
-  const sesion = cargarSesion();
-  if (!sesion) {
-    cambiarVista("landing");
-  }
+  cambiarVista("landing");
 });
 
 // Subnavegación exclusiva del Coordinador (Centro de Mando <-> Bitácora)
@@ -516,14 +506,16 @@ document.querySelector("#btn-subnav-bitacora")?.addEventListener("click", () => 
 // ============================================================================
 function guardarSesion(sesion) {
   try {
-    localStorage.setItem("alerta_plaga_sesion", JSON.stringify(sesion));
+    sessionStorage.setItem("alerta_plaga_sesion", JSON.stringify(sesion));
+    // Limpieza estricta de localStorage para evitar que la sesión persista tras salir o entre pestañas
+    localStorage.removeItem("alerta_plaga_sesion");
   } catch {}
   actualizarBadgeSesion(sesion);
 }
 
 function cargarSesion() {
   try {
-    const raw = localStorage.getItem("alerta_plaga_sesion");
+    const raw = sessionStorage.getItem("alerta_plaga_sesion");
     if (raw) return JSON.parse(raw);
   } catch {}
   return null;
@@ -609,6 +601,10 @@ function abrirModalAuthAgricultor() {
 
 function cerrarModalAuthAgricultor() {
   document.querySelector("#modal-auth-agricultor")?.classList.add("oculto");
+  const sesion = cargarSesion();
+  if (!sesion && estadoApp.vistaActual === "agricultor") {
+    cambiarVista("landing");
+  }
 }
 
 function abrirModalAuthCoordinador() {
@@ -619,10 +615,97 @@ function cerrarModalAuthCoordinador() {
   document.querySelector("#modal-auth-coordinador")?.classList.add("oculto");
 }
 
+function cerrarSesionUsuario() {
+  try {
+    sessionStorage.removeItem("alerta_plaga_sesion");
+    localStorage.removeItem("alerta_plaga_sesion");
+  } catch {}
+  chatHistorialParcelas.clear();
+  puntosDanioPorParcela.clear();
+  pctDanioPorParcela.clear();
+  estadoApp.productorActualId = null;
+  estadoApp.parcelaActual = null;
+  puntoDanioActual = null;
+  pctDanioActual = 10;
+
+  // Limpiar capas del mapa del agricultor
+  if (marcadorDanio && mapAgricultor) {
+    try { mapAgricultor.removeLayer(marcadorDanio); } catch {}
+    marcadorDanio = null;
+  }
+  if (circuloDanio && mapAgricultor) {
+    try { mapAgricultor.removeLayer(circuloDanio); } catch {}
+    circuloDanio = null;
+  }
+  if (poligonoParcela && mapAgricultor) {
+    try { mapAgricultor.removeLayer(poligonoParcela); } catch {}
+    poligonoParcela = null;
+  }
+
+  // Limpiar adjuntos y grabación en curso si existía
+  limpiarAdjuntosChat();
+  if (grabacionActiva) {
+    grabacionCancelada = true;
+    if (grabacionTimer) clearInterval(grabacionTimer);
+    grabacionActiva = false;
+    document.querySelector("#chat-grabando-banner")?.classList.add("oculto");
+  }
+
+  const feed = document.querySelector("#chat-mensajes");
+  if (feed) feed.innerHTML = "";
+  const tabs = document.querySelector("#agr-parcelas-tabs");
+  if (tabs) tabs.innerHTML = "";
+  const statusBox = document.querySelector("#agr-visita-status");
+  if (statusBox) statusBox.innerHTML = "";
+
+  // Restablecer campos de identidad en tarjeta de agricultor
+  const elNombre = document.querySelector("#agr-productor-nombre");
+  if (elNombre) elNombre.textContent = "—";
+  const elId = document.querySelector("#agr-productor-id");
+  if (elId) elId.textContent = "Sin sesión activa";
+  const chatBadge = document.querySelector("#chat-parcela-badge");
+  if (chatBadge) chatBadge.textContent = "🌱 Sin parcela seleccionada";
+
+  actualizarBadgeSesion(null);
+  document.querySelector("#nav-coordinador")?.classList.add("oculto");
+  cambiarVista("landing");
+  mostrarToast("🚪 Sesión cerrada correctamente");
+}
+
 function inicializarEventosAuth() {
-  // Botones de acceso en Landing Page
-  document.querySelector("#btn-entrar-agricultor")?.addEventListener("click", abrirModalAuthAgricultor);
-  document.querySelector("#btn-entrar-coordinador")?.addEventListener("click", abrirModalAuthCoordinador);
+  // Botones y tarjetas de acceso en Landing Page
+  const navegarOAutenticarAgri = () => {
+    const sesion = cargarSesion();
+    if (sesion && sesion.rol === "agricultor") {
+      cambiarVista("agricultor");
+    } else {
+      abrirModalAuthAgricultor();
+    }
+  };
+
+  const navegarOAutenticarCoord = () => {
+    const sesion = cargarSesion();
+    if (sesion && (sesion.rol === "coordinador" || sesion.rol === "tecnico")) {
+      cambiarVista("tecnico");
+    } else {
+      abrirModalAuthCoordinador();
+    }
+  };
+
+  document.querySelector("#btn-entrar-agricultor")?.addEventListener("click", navegarOAutenticarAgri);
+  document.querySelector("#card-acceso-agricultor")?.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    navegarOAutenticarAgri();
+  });
+
+  document.querySelector("#btn-entrar-coordinador")?.addEventListener("click", navegarOAutenticarCoord);
+  document.querySelector("#card-acceso-coordinador")?.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    navegarOAutenticarCoord();
+  });
+
+  // Botón para cambiar productor directamente desde el portal del agricultor
+  document.querySelector("#btn-cambiar-productor")?.addEventListener("click", abrirModalAuthAgricultor);
 
   // Cerrar modales
   document.querySelector("#btn-cerrar-auth-agri")?.addEventListener("click", cerrarModalAuthAgricultor);
@@ -648,7 +731,7 @@ function inicializarEventosAuth() {
   // Confirmar acceso Agricultor
   document.querySelector("#btn-confirmar-auth-agri")?.addEventListener("click", () => {
     const select = document.querySelector("#select-auth-productor");
-    const pid = select?.value || "PR-101";
+    const pid = select?.value || (estadoApp.productores[0]?.id || "PR-101");
     const prod = mapaProductores.get(pid);
     const sesion = {
       rol: "agricultor",
@@ -698,55 +781,9 @@ function inicializarEventosAuth() {
     confirmarAuthCoord();
   });
 
-  // Botón Salir / Cerrar Sesión en badge
-  document.querySelector("#btn-cerrar-sesion")?.addEventListener("click", () => {
-    try {
-      localStorage.removeItem("alerta_plaga_sesion");
-    } catch {}
-    chatHistorialParcelas.clear();
-    puntosDanioPorParcela.clear();
-    pctDanioPorParcela.clear();
-    estadoApp.productorActualId = null;
-    estadoApp.parcelaActual = null;
-    puntoDanioActual = null;
-    pctDanioActual = 10;
-
-    // Limpiar capas del mapa del agricultor
-    if (marcadorDanio && mapAgricultor) {
-      try { mapAgricultor.removeLayer(marcadorDanio); } catch {}
-      marcadorDanio = null;
-    }
-    if (circuloDanio && mapAgricultor) {
-      try { mapAgricultor.removeLayer(circuloDanio); } catch {}
-      circuloDanio = null;
-    }
-    if (poligonoParcela && mapAgricultor) {
-      try { mapAgricultor.removeLayer(poligonoParcela); } catch {}
-      poligonoParcela = null;
-    }
-
-    // Limpiar adjuntos y grabación en curso si existía
-    limpiarAdjuntosChat();
-    if (grabacionActiva) {
-      grabacionCancelada = true;
-      if (grabacionTimer) clearInterval(grabacionTimer);
-      grabacionActiva = false;
-      document.querySelector("#chat-grabando-banner")?.classList.add("oculto");
-    }
-
-    const feed = document.querySelector("#chat-mensajes");
-    if (feed) feed.innerHTML = "";
-    const tabs = document.querySelector("#agr-parcelas-tabs");
-    if (tabs) tabs.innerHTML = "";
-    const statusBox = document.querySelector("#agr-visita-status");
-    if (statusBox) statusBox.innerHTML = "";
-
-    actualizarBadgeSesion(null);
-    document.querySelector("#nav-coordinador")?.classList.add("oculto");
-    cambiarVista("landing");
-    mostrarToast("🚪 Sesión cerrada correctamente");
-  });
-
+  // Botón Salir / Cerrar Sesión en badge superior y en tarjeta de agricultor
+  document.querySelector("#btn-cerrar-sesion")?.addEventListener("click", cerrarSesionUsuario);
+  document.querySelector("#btn-cerrar-sesion-agri")?.addEventListener("click", cerrarSesionUsuario);
 }
 
 // ============================================================================
@@ -1435,20 +1472,20 @@ function actualizarBannerVisitaParcela(parcelaId) {
             ${casoActivo.brote ? " · ⚠️ <b>Alerta de Brote Zonal activa</b>." : ""}
             Favor de mantener libre acceso al predio.
           </p>
-          ${avisoCritico ? `<div style="margin-top:8px; padding:6px 10px; background:rgba(239,68,68,0.18); border-left:3px solid #ef4444; border-radius:4px; font-size:12px; color:#fca5a5;"><strong>📢 Aviso Oficial Directo:</strong> ${escaparHtml(avisoCritico.mensaje)}</div>` : ""}
+          ${avisoCritico ? `<div style="margin-top:10px; padding:8px 12px; background:#7f1d1d; border-left:4px solid #ef4444; border-radius:6px; font-size:12.5px; color:#ffffff; font-weight:600;"><strong style="color:#fef08a;">📢 Aviso Oficial Directo:</strong> ${escaparHtml(avisoCritico.mensaje)}</div>` : ""}
         </div>
       </div>
     `;
   } else if (avisoCritico && p) {
     box.innerHTML = `
-      <div class="visita-card visita-activa" style="border-color: #f59e0b;">
-        <div class="visita-icon">⚠️</div>
+      <div class="visita-card visita-activa visita-aviso-critico">
+        <div class="visita-icon" style="font-size:30px;">🚨</div>
         <div class="visita-content">
           <div class="visita-top">
-            <span class="badge-visita-urgente" style="background:#f59e0b;">AVISO FITOSANITARIO CRÍTICO EN ZONA</span>
+            <span class="badge-aviso-critico-zona"><span style="color:#fef08a;">⚠️</span> AVISO FITOSANITARIO CRÍTICO EN ZONA</span>
           </div>
-          <h4>Alerta Sanitaria en la cercanía de Parcela ${escaparHtml(p.id)}</h4>
-          <p>${escaparHtml(avisoCritico.mensaje)}</p>
+          <h4 style="color:#ffffff; font-weight:800; font-size:16px; margin:4px 0 6px;">Alerta Sanitaria en la cercanía de Parcela ${escaparHtml(p.id)}</h4>
+          <p style="color:#fee2e2; font-size:13.5px; line-height:1.5; font-weight:500;">${escaparHtml(avisoCritico.mensaje)}</p>
         </div>
       </div>
     `;
@@ -2106,7 +2143,7 @@ async function procesarEnvioChat(textoMensaje) {
         equipo_id: "equipo07",
         reporte_id: folioNuevo,
         tipo: diag.brote ? "brote" : "folio",
-        para: [estadoApp.productorActualId || "PR-101", "coordinador"],
+        para: [...(estadoApp.productorActualId ? [estadoApp.productorActualId] : []), "coordinador"],
         mensaje: `Reporte ${folioNuevo} registrado en parcela ${p.id} (${plagaObj.nombre}, semáforo ${semaforoVal}). Prioridad: ${prioridadVal} pts.`,
         creado: new Date().toISOString(),
       });
@@ -2919,15 +2956,17 @@ function iniciarPanel() {
   poblarModalAuthAgricultor();
   inicializarEventosAuth();
 
-  // Seleccionar una parcela inicial por defecto
-  seleccionarParcelaAgricultor("P-001");
-
   const bitCultivo = document.querySelector("#bit-cultivo");
   if (bitCultivo) bitCultivo.value = "maíz";
 
   cargarBitacora();
 
-  // Restaurar sesión persistida si existe
+  // Purga defensiva inicial de cualquier residuo previo en localStorage
+  try {
+    localStorage.removeItem("alerta_plaga_sesion");
+  } catch {}
+
+  // Restaurar sesión de la pestaña actual (sessionStorage) si existe
   const sesionGuardada = cargarSesion();
   if (sesionGuardada) {
     aplicarSesion(sesionGuardada);

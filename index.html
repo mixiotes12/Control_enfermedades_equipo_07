@@ -77,8 +77,8 @@
         <div id="usuario-sesion-badge" class="sesion-pill oculto">
           <span id="sesion-icono">👤</span>
           <div class="sesion-datos">
-            <strong id="sesion-nombre">Fidel Jiménez</strong>
-            <small id="sesion-rol">Productor · PR-101</small>
+            <strong id="sesion-nombre">—</strong>
+            <small id="sesion-rol">Sin sesión activa</small>
           </div>
           <button type="button" id="btn-cerrar-sesion" class="btn-cerrar-sesion" title="Cerrar sesión y volver al inicio">
             <span>🚪</span>
@@ -498,13 +498,23 @@
           </div>
         </div>
       </div>
-      <!-- Tarjeta fija de sesión de productor (sin selectores para cambiar) -->
+      <!-- Tarjeta fija de sesión de productor (con cambio explícito de cuenta sin selects ajenos) -->
       <div class="productor-sesion-card" id="productor-sesion-card">
         <div class="prod-avatar">👨‍🌾</div>
         <div class="prod-info">
           <span class="prod-badge-verified">✓ Productor en Sesión Activa</span>
-          <strong id="agr-productor-nombre">Fidel Jiménez</strong>
-          <span class="prod-sub" id="agr-productor-id">Clave: PR-101 · Texcoco, Edo. Méx.</span>
+          <strong id="agr-productor-nombre">—</strong>
+          <span class="prod-sub" id="agr-productor-id">Sin sesión activa</span>
+        </div>
+        <div class="prod-card-actions">
+          <button type="button" id="btn-cambiar-productor" class="btn-cambiar-productor" title="Cambiar a otra cuenta de productor">
+            <span>🔄</span>
+            <span>Cambiar Productor</span>
+          </button>
+          <button type="button" id="btn-cerrar-sesion-agri" class="btn-salir-agricultor" title="Cerrar sesión de productor">
+            <span>🚪</span>
+            <span>Cerrar Sesión</span>
+          </button>
         </div>
       </div>
     </div>
@@ -540,7 +550,7 @@
             </div>
           </div>
           <div class="chat-parcela-tag">
-            <span id="chat-parcela-badge">🌱 Parcela P-001 (Maíz)</span>
+            <span id="chat-parcela-badge">🌱 Sin parcela seleccionada</span>
           </div>
         </div>
 

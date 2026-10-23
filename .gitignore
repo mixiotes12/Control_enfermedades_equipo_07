@@ -6,3 +6,4 @@ __pycache__/
 *.pyc
 bitacora_servidor.json
 preguntas_activas.json
+test_25_casos_adversariales.py
